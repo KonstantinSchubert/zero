@@ -20,7 +20,7 @@ def main():
     api = FileAPI(account_info=None, account_id=None, application_key=None, bucket_id=None)
     cache = Cache(args.cache_folder)
     filesystem = Filesystem(api, cache)
-    FUSE(filesystem, args.mountpoint, nothreads=True, foreground=True)
+    FUSE(filesystem, args.mountpoint, nothreads=True, foreground=True, debug=True)
 
 
 if __name__ == '__main__':

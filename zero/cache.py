@@ -1,5 +1,4 @@
 import os
-import errno
 from fuse import FuseOSError
 
 CACHE_ENDINGS = [
@@ -44,7 +43,7 @@ class Cache:
             return cache_path
         elif os.path.exists(cache_path + self.anti_collision_hash + "dummy"):
             return cache_path + "dummy"
-        raise FuseOSError(errno.EACCES)
+        return None
 
     def _get_path(self, fuse_path):
         cache_path = self._to_cache_path(fuse_path)
@@ -62,7 +61,6 @@ class Cache:
         )
 
     def list(self, dir_path, fh):
-        print(self, dir_path, fh)
         return ['.', '..'] + [
             self._strip_cache_ending(path) for path 
             in self._list_nodes_and_dummies(dir_path)
@@ -81,10 +79,14 @@ class Cache:
             os.lseek(fh, offset, 0)
             return os.write(fh, data)
 
+    def create(self, path, mode):
+        cache_path = self._to_cache_path(path)
+        return os.open(cache_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
 
 
 def on_cache_path_or_dummy(func):
     def using_cache_path_or_dummy(self, fuse_path, *args, **kwargs):
+        print(func, fuse_path, args, kwargs)
         cache_path = self.cache._get_path_or_dummy(fuse_path)
         return func(self, cache_path, *args, **kwargs)
     return using_cache_path_or_dummy
@@ -93,6 +95,7 @@ def on_cache_path_or_dummy(func):
 
 def on_cache_path_enforce_local(func):
     def using_cache_path_enforce_local(self, fuse_path, *args, **kwargs):
+        print(func, fuse_path, args, kwargs)
         cache_path = self.cache._get_path(fuse_path)
         return func(self, cache_path, *args, **kwargs)
     return using_cache_path_enforce_local
