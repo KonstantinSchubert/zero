@@ -3,35 +3,38 @@ import os
 from fuse import FuseOSError, Operations
 from threading import Lock
 
-# let's use os.realpath to do the path -> cache_path mapping!!!!
+from .cache import on_cache_path_or_dummy, on_cache_path_enforce_local
 
 class Filesystem(Operations):
+    """Implements the fuse operations.
+    Operations use cache decorators if possible and are deferred to the cache
+    module if more complex cache operations are needed.
+    This is a bit of a fuzzy boundary that I am not really happy with.
+    """
 
     def __init__(self, api, cache):
         self.api = api
         self.cache = cache
         self.rwlock = Lock()
 
-
+    @on_cache_path_or_dummy
     def access(self, path, mode):
-        actual_file_path = self.cache.get_path_or_dummy(path)
-        if not os.access(actual_file_path, mode):
+        if not os.access(path, mode):
             raise FuseOSError(EACCES)
 
+    @on_cache_path_or_dummy
     def getattr(self, path, fh=None):
-        cache_path = self.cache.get_path_or_dummy(path)
-        stat = os.lstat(cache_path)
+        stat = os.lstat(path)
         return dict((key, getattr(stat, key)) for key in ('st_atime', 'st_ctime',
              'st_gid', 'st_mode', 'st_mtime', 'st_nlink', 'st_size', 'st_uid'))
 
+    @on_cache_path_or_dummy
     def chmod(self, path, mode):
-        cache_path = self.cache.get_path_or_dummy()
-        os.chmod(cache_path, mode)
-        return
+        os.chmod(path, mode)
 
+    @on_cache_path_or_dummy
     def chown(self, path, uid, gid):
-        cache_path = self.cache.get_path_or_dummy()
-        return os.chown(cache_path, uid, gid)
+        return os.chown(path, uid, gid)
 
 
     getxattr = None
@@ -43,22 +46,22 @@ class Filesystem(Operations):
     listxattr = None
 
     def mkdir(self, path, mode):
-        cache_path = cache.get_cache_path(path)
-        return os.mkdir(cache_path, mode)
+        return self.cache.mkdir(path, mode)
 
+    @on_cache_path_enforce_local
     def open(self, path, flags):
-        cache_file_path = cache.get_path(path)
-        return os.open(cache_file_path, flags)
+        return os.open(path, flags)
 
+    @on_cache_path_enforce_local
     def read(self, path, size, offset, fh):
         # I think the file handle will be the one for the file in the cache, right?
         with self.rwlock:
             os.lseek(fh, offset, 0)
             return os.read(fh, size)
 
+    @on_cache_path_enforce_local
     def readdir(self, path, fh):
-        # todo: Do I need to handle the file handle here?
-        return ['.', '..'] + cache.list_effective_nodes(path)
+        return self.cache.list(path, fh)
 
     # def readlink(??):
     #     todo
@@ -86,7 +89,4 @@ class Filesystem(Operations):
     #     todo
 
     def write(self, path, data, offset, fh):
-        # I think the file handle will be the one for the file in the cache?
-        with self.rwlock:
-            os.lseek(fh, offset, 0)
-            return os.write(fh, data)
+        self.cache.write(self, path, data, offset, fh)
