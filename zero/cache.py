@@ -38,6 +38,11 @@ class Cache:
             return cache_path
 
     def _get_path_or_dummy(self, fuse_path):
+        """Get cache path for given fuse_path.
+        If it is a file and file is not in cache, return path to dummy file.
+        If there is no diummy file either, then the file does not exist.
+        In this case, return None
+        """
         cache_path = self._to_cache_path(fuse_path)
         if os.path.exists(cache_path):
             return cache_path
@@ -73,15 +78,18 @@ class Cache:
         with open(dirty_file, 'a'):
             os.utime(dirty_file, times=None)
 
-    def write(self, path, data, offset, fh):
-    # I think the file handle will be the one for the file in the cache?
-        with self.rwlock:
+    def write(self, rwlock, path, data, offset, fh):
+        # I think the file handle will be the one for the file in the cache?
+        with rwlock:
             os.lseek(fh, offset, 0)
             return os.write(fh, data)
+        # todo: add dirty file
 
     def create(self, path, mode):
         cache_path = self._to_cache_path(path)
-        return os.open(cache_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
+        result = os.open(cache_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
+        # todo: add dirty file
+        return result
 
 
 def on_cache_path_or_dummy(func):

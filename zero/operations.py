@@ -28,7 +28,9 @@ class Filesystem(Operations):
     @on_cache_path_or_dummy
     def getattr(self, path, fh=None):
         if path is None:
+            print(path, "does not exist")
             raise FuseOSError(errno.ENOENT)
+        print(path, "does exist")
         stat = os.lstat(path)
         vals = dict(
             (key, getattr(stat, key)) for key in (
@@ -65,8 +67,8 @@ class Filesystem(Operations):
     def open(self, path, flags):
         return os.open(path, flags)
 
-    @on_cache_path_enforce_local
     def read(self, path, size, offset, fh):
+        print("read", path, size, offset, fh)
         # I think the file handle will be the one for the file in the cache, right?
         with self.rwlock:
             os.lseek(fh, offset, 0)
@@ -78,6 +80,7 @@ class Filesystem(Operations):
 
 
     def release(self, path, fh):
+        print("release", path, fh)
         # I think the file handle will be the one for the file in the cache?
         return os.close(fh)
 
@@ -96,8 +99,8 @@ class Filesystem(Operations):
 
     def create(self, path, mode):
         print("create", path, mode)
-        self.cache.create(path, mode)
-        
+        return self.cache.create(path, mode)
+
     def rename(self, old, new):
         raise
 
@@ -120,4 +123,5 @@ class Filesystem(Operations):
         raise
 
     def write(self, path, data, offset, fh):
-        self.cache.write(self, path, data, offset, fh)
+        print("write", path, offset, fh)
+        self.cache.write(self.rwlock, path, data, offset, fh)
