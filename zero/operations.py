@@ -28,9 +28,7 @@ class Filesystem(Operations):
     @on_cache_path_or_dummy
     def getattr(self, path, fh=None):
         if path is None:
-            print(path, "does not exist")
             raise FuseOSError(errno.ENOENT)
-        print(path, "does exist")
         stat = os.lstat(path)
         vals = dict(
             (key, getattr(stat, key)) for key in (
@@ -55,6 +53,7 @@ class Filesystem(Operations):
 
     def link(self, target, source):
         print("link")
+        print("RAISING NON IMPLEMENTED")
         raise # What if target or source are not in our file system??
     
     listxattr = None
@@ -87,9 +86,13 @@ class Filesystem(Operations):
 
     def flush(self, path, fh):
         print("flush", path, fh)
+        # I must wait with uploading a written file until the flush and fsync for it happened, right?
+        # Or am I safe if I just upload *closed* files?
         return os.fsync(fh)
 
     def fsync(self, path, datasync, fh):
+        # I must wait with uploading a written file until the flush and fsync for it happened, right?
+        # Or am I safe if I just upload *closed* files?
         print("fsync", path, fh)
         if datasync != 0:
             return os.fdatasync(fh)
@@ -102,26 +105,34 @@ class Filesystem(Operations):
         return self.cache.create(path, mode)
 
     def rename(self, old, new):
+        print("RAISING NON IMPLEMENTED")
         raise
 
     def statfs(self, path):
+        print("RAISING NON IMPLEMENTED")
         raise
 
     def readlink(self, *args, **kwargs):
+        print("RAISING NON IMPLEMENTED")
         raise
 
     def symlink(self, target, source):
+        print("RAISING NON IMPLEMENTED")
         raise
 
+    @on_cache_path_enforce_local
     def truncate(self, path, length, fh=None):
-        raise
+        with open(path, 'r+') as f:
+            f.truncate(length)
 
     def unlink(self, *args):
+        print("RAISING NON IMPLEMENTED")
         raise
 
     def utimes(self, **kwargs):
+        print("RAISING NON IMPLEMENTED")
         raise
 
     def write(self, path, data, offset, fh):
         print("write", path, offset, fh)
-        self.cache.write(self.rwlock, path, data, offset, fh)
+        return self.cache.write(self.rwlock, path, data, offset, fh)

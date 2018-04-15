@@ -53,7 +53,7 @@ class Cache:
     def _get_path(self, fuse_path):
         cache_path = self._to_cache_path(fuse_path)
         if os.path.exists(cache_path + self.anti_collision_hash + "dummy"):
-            raise
+            raise # todo: implement this
             # synchronously download real file and replace dummy 
         return cache_path
 
@@ -65,10 +65,10 @@ class Cache:
             if self._get_cache_ending(node) in [ None, "dummy"]
         )
 
-    def list(self, dir_path, fh):
+    def list(self, cache_dir_path, fh):
         return ['.', '..'] + [
             self._strip_cache_ending(path) for path 
-            in self._list_nodes_and_dummies(dir_path)
+            in self._list_nodes_and_dummies(cache_dir_path)
         ]
 
     def mkdir(self, fuse_path, mode):
