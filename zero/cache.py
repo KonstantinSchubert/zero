@@ -9,6 +9,11 @@ CACHE_ENDINGS = [
     "dummy"
 ]
 
+Aside from dummy, I should store the dirty/cleaning/todelete/deleting in some kind of database(es) istead of using 
+files.
+
+This impoves discoverability and it allows me to delte a folder while its contents are still "todelete"
+
 class Cache:
     def __init__(self, cache_folder, anti_collision_hash = ""):
         self.cache_folder = cache_folder
@@ -30,10 +35,14 @@ class Cache:
             if cache_path.endswith(self.anti_collision_hash + ending):
                 return ending
 
+    def _add_cache_ending(self, cache_path, ending):
+        return cache_path + self.anti_collision_hash + ending
+
     def _strip_cache_ending(self, cache_path):
         ending = self._get_cache_ending(cache_path)
         if ending:
-            return cache_path[:-len(ending)]
+            num_characters_to_strip = len(self.anti_collision_hash)+len(ending)
+            return cache_path[:-num_characters_to_strip]
         else:
             return cache_path
 
@@ -65,6 +74,20 @@ class Cache:
             if self._get_cache_ending(node) in [ None, "dummy"]
         )
 
+    def _touch_dirty_file(self, cache_path):
+        # How will the cache manager find this ins a big file tree? Mark the parent dirs as "todo" somehow?
+        dirty_file = cache_path + self.anti_collision_hash + "dirty"
+        with open(dirty_file, 'a'):
+            os.utime(dirty_file, times=None)
+
+
+    def _touch_todelete_file(self, cache_path):
+        # How will the cache manager find this in a big file tree? Mark the parent dirs as "todo" somehow?
+        dirty_file = cache_path + self.anti_collision_hash + "todelete"
+        with open(dirty_file, 'a'):
+            os.utime(dirty_file, times=None)
+
+
     def list(self, cache_dir_path, fh):
         return ['.', '..'] + [
             self._strip_cache_ending(path) for path 
@@ -74,9 +97,7 @@ class Cache:
     def mkdir(self, fuse_path, mode):
         cache_path = self._to_cache_path(fuse_path)
         os.mkdir(cache_path, mode)
-        dirty_file = cache_path + self.anti_collision_hash + "dirty"
-        with open(dirty_file, 'a'):
-            os.utime(dirty_file, times=None)
+        self._touch_dirty_file(cache_path)
 
     def write(self, rwlock, path, data, offset, fh):
         # I think the file handle will be the one for the file in the cache?
@@ -88,8 +109,16 @@ class Cache:
     def create(self, path, mode):
         cache_path = self._to_cache_path(path)
         result = os.open(cache_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
-        # todo: add dirty file
+        self._touch_dirty_file(cache_path)
         return result
+
+    def unlink(self, rwlock, cache_path):
+        with rwlock:
+            os.unlink(cache_path)
+            # todo: also delete any potential dirty-notes for this cache path
+            # path might be dummy file path, so strip ending
+            cache_path = self._strip_cache_ending(cache_path)
+            self._touch_todelete_file(cache_path)
 
 
 def on_cache_path_or_dummy(func):

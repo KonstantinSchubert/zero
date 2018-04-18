@@ -125,9 +125,10 @@ class Filesystem(Operations):
         with open(path, 'r+') as f:
             f.truncate(length)
 
-    def unlink(self, *args):
-        print("RAISING NON IMPLEMENTED")
-        raise
+    @on_cache_path_or_dummy
+    def unlink(self, path):
+        print("unlink")
+        return self.cache.unlink(self.rwlock, path)
 
     def utimes(self, **kwargs):
         print("RAISING NON IMPLEMENTED")
