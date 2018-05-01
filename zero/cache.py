@@ -86,8 +86,8 @@ class Cache:
             os.unlink(cache_path)
             # todo: also delete any potential dirty-notes for this cache path
             # path might be dummy file path, so strip ending
-            cache_path = self._strip_dummy_ending(cache_path)
-            self.state_store.set_todelete(cache_path)
+            cache_path_stripped = self._strip_dummy_ending(cache_path)
+            self.state_store.set_todelete(cache_path_stripped)
 
 
 def on_cache_path_or_dummy(func):
@@ -107,3 +107,9 @@ def on_cache_path_enforce_local(func):
     return using_cache_path_enforce_local
 
 
+def on_cache_path(func):
+    def using_cache_path(self, fuse_path, *args, **kwargs):
+        print(func, fuse_path, args, kwargs)
+        cache_path = self.cache._to_cache_path(fuse_path)
+        return func(self, cache_path, *args, **kwargs)
+    return using_cache_path

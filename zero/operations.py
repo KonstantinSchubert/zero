@@ -4,7 +4,7 @@ import errno
 from fuse import FuseOSError, Operations
 from threading import Lock
 
-from .cache import on_cache_path_or_dummy, on_cache_path_enforce_local
+from .cache import on_cache_path, on_cache_path_or_dummy, on_cache_path_enforce_local
 
 class Filesystem(Operations):
     """Implements the fuse operations.
@@ -108,22 +108,43 @@ class Filesystem(Operations):
         print("RAISING NON IMPLEMENTED")
         raise
 
+    @on_cache_path_or_dummy
     def statfs(self, path):
-        print("RAISING NON IMPLEMENTED")
-        raise
+        cache_stat_info = os.statvfs(path)
+        stat_info =  {
+            key : getattr(cache_stat_info, key)  for key in (
+                'f_bavail', 'f_bfree', 'f_blocks', 'f_bsize', 'f_favail',
+                'f_ffree', 'f_files', 'f_flag', 'f_frsize', 'f_namemax'
+            )
+        }
 
-    def readlink(self, *args, **kwargs):
-        print("RAISING NON IMPLEMENTED")
-        raise
+        # Todo: Remove some keys from above's list and set them here
+        # stat_info[""]
 
-    def symlink(self, target, source):
-        print("RAISING NON IMPLEMENTED")
-        raise
+        return stat_info
+
+
+    todo: since symlinks are always local, make sure they are not marked as dirty and not marked as todelete etc...
+
+    @on_cache_path  # links are always local
+    def readlink(self, path):
+        return os.readlink(path)
+
+    @on_cache_path
+    def symlink(self, path, target):
+        return os.symlink(target, path)
+
 
     @on_cache_path_enforce_local
     def truncate(self, path, length, fh=None):
         with open(path, 'r+') as f:
             f.truncate(length)
+
+    @on_cache_path_enforce_local 
+    # dirs are always local
+    def rmdir(self, *args, **kwargs):
+        print("rmdir", args, kwargs)
+        return os.rmdir(*args, **kwargs)
 
     @on_cache_path_or_dummy
     def unlink(self, path):

@@ -39,7 +39,7 @@ class StateStore:
         self._set_state_on_path(path, STATES.DELETING)
 
 
-    def _path_has_state(self, path, state)
+    def _path_has_state(self, path, state):
         cursor = self.connection.execute(
             '''SELECT state FROM states WHERE nodepath = ? AND state = ?''',
             (path, state)
@@ -49,7 +49,5 @@ class StateStore:
     def _set_state_on_path(self, path, state):
         with self.connection:
             self.connection.execute(
-                '''INSERT OR REPLACE INTO states (nodepath, state) VALUES (path, state)'''
+                '''INSERT OR REPLACE INTO states (nodepath, state) VALUES (?, ?)''', (path, state)
             )
-
-
