@@ -54,7 +54,10 @@ class Filesystem(Operations):
     def link(self, target, source):
         print("link")
         print("RAISING NON IMPLEMENTED")
-        raise # What if target or source are not in our file system??
+        # I can maintain a hard link table that basically lists for each path the  "inode" number ( doesn't need to be the real inode number )
+        # Then, whenever I replace a file with its dummy, I must consider this table to also configure all other hard links to that inode. Maybe on the remote end I can even use "inode" number as keys for the files that are uploaded
+        # This does not solve hard links which point from my file system to another file system or vice versa
+        raise
     
     listxattr = None
 
@@ -122,9 +125,6 @@ class Filesystem(Operations):
         # stat_info[""]
 
         return stat_info
-
-
-    todo: since symlinks are always local, make sure they are not marked as dirty and not marked as todelete etc...
 
     @on_cache_path  # links are always local
     def readlink(self, path):

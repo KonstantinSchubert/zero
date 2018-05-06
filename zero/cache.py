@@ -83,12 +83,18 @@ class Cache:
 
     def unlink(self, rwlock, cache_path):
         with rwlock:
+            is_link = self.is_link(cache_path)
             os.unlink(cache_path)
-            # todo: also delete any potential dirty-notes for this cache path
-            # path might be dummy file path, so strip ending
-            cache_path_stripped = self._strip_dummy_ending(cache_path)
-            self.state_store.set_todelete(cache_path_stripped)
+            if not is_link:
+                cache_path_stripped = self._strip_dummy_ending(cache_path)
+                self.state_store.set_todelete(cache_path_stripped)
 
+
+    @staticmethod
+    def is_link(cache_path):
+        print(cache_path)
+        print(os.path.islink(cache_path))
+        return os.path.islink(cache_path)
 
 def on_cache_path_or_dummy(func):
     def using_cache_path_or_dummy(self, fuse_path, *args, **kwargs):
