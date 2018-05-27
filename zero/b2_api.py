@@ -10,7 +10,7 @@ class FileAPI:
         self.bucket_api = Bucket(self.api, bucket_id)
 
     def upload(self, file):
-        data = file.read(0, len(file))
+        data = file.read()
         print(len(data))
         self.bucket_api.upload_bytes(bytes(data), self.file_info["fileName"])
         # self.b2fuse._update_directory_structure() //<-?? copyp-pasted from b2_fuse
