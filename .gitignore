@@ -1,2 +1,5 @@
 __pycache__
 *egg-info
+b2_real_credentials.py
+state.db
+.pytest_cache

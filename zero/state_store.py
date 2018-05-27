@@ -1,17 +1,20 @@
 import sqlite3
 
+
 class STATES:
-    DIRTY = 'DIRTY'
-    CLEANING = 'CLEANING'
-    TODELETE = 'TODELETE'
-    DELETING = 'DELETING'
+    DIRTY = "DIRTY"
+    CLEANING = "CLEANING"
+    TODELETE = "TODELETE"
+    DELETING = "DELETING"
+
 
 class StateStore:
+
     def __init__(self):
-        self.connection = sqlite3.connect('state.db')
+        self.connection = sqlite3.connect("state.db")
         with self.connection:
             self.connection.execute(
-                '''CREATE TABLE IF NOT EXISTS states (nodepath text primary key, state text)'''
+                """CREATE TABLE IF NOT EXISTS states (nodepath text primary key, state text)"""
             )
 
     def is_dirty(self, path):
@@ -38,16 +41,16 @@ class StateStore:
     def set_deleting(self, path):
         self._set_state_on_path(path, STATES.DELETING)
 
-
     def _path_has_state(self, path, state):
         cursor = self.connection.execute(
-            '''SELECT state FROM states WHERE nodepath = ? AND state = ?''',
-            (path, state)
+            """SELECT state FROM states WHERE nodepath = ? AND state = ?""",
+            (path, state),
         )
         return cursor.fetchone() is None
 
     def _set_state_on_path(self, path, state):
         with self.connection:
             self.connection.execute(
-                '''INSERT OR REPLACE INTO states (nodepath, state) VALUES (?, ?)''', (path, state)
+                """INSERT OR REPLACE INTO states (nodepath, state) VALUES (?, ?)""",
+                (path, state),
             )

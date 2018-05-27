@@ -4,7 +4,12 @@ import errno
 from fuse import FuseOSError, Operations
 from threading import Lock
 
-from .cache import on_cache_path, on_cache_path_or_dummy, on_cache_path_enforce_local
+from .cache import (
+    on_cache_path,
+    on_cache_path_or_dummy,
+    on_cache_path_enforce_local,
+)
+
 
 class Filesystem(Operations):
     """Implements the fuse operations.
@@ -31,10 +36,16 @@ class Filesystem(Operations):
             raise FuseOSError(errno.ENOENT)
         stat = os.lstat(path)
         vals = dict(
-            (key, getattr(stat, key)) for key in (
-                'st_atime', 'st_ctime', 'st_gid', 
-                'st_mode', 'st_mtime', 'st_nlink', 
-                'st_size', 'st_uid'
+            (key, getattr(stat, key))
+            for key in (
+                "st_atime",
+                "st_ctime",
+                "st_gid",
+                "st_mode",
+                "st_mtime",
+                "st_nlink",
+                "st_size",
+                "st_uid",
             )
         )
         return vals
@@ -47,18 +58,20 @@ class Filesystem(Operations):
     def chown(self, path, uid, gid):
         return os.chown(path, uid, gid)
 
-
     getxattr = None
-
 
     def link(self, target, source):
         print("link")
         print("RAISING NON IMPLEMENTED")
-        # I can maintain a hard link table that basically lists for each path the  "inode" number ( doesn't need to be the real inode number )
-        # Then, whenever I replace a file with its dummy, I must consider this table to also configure all other hard links to that inode. Maybe on the remote end I can even use "inode" number as keys for the files that are uploaded
-        # This does not solve hard links which point from my file system to another file system or vice versa
+        # I can maintain a hard link table that basically lists for each path
+        # the  "inode" number ( doesn't need to be the real inode number )
+        # Then, whenever I replace a file with its dummy, I must consider this
+        # table to also configure all other hard links to that inode. Maybe on
+        # the remote end I can even use "inode" number as keys for the files
+        # that are uploaded. This does not solve hard links which point from
+        # my file system to another file system or vice versa
         raise
-    
+
     listxattr = None
 
     def mkdir(self, path, mode):
@@ -71,7 +84,8 @@ class Filesystem(Operations):
 
     def read(self, path, size, offset, fh):
         print("read", path, size, offset, fh)
-        # I think the file handle will be the one for the file in the cache, right?
+        # I think the file handle will be the one for the file in the cache,
+        # right?
         with self.rwlock:
             os.lseek(fh, offset, 0)
             return os.read(fh, size)
@@ -80,28 +94,27 @@ class Filesystem(Operations):
     def readdir(self, path, fh):
         return self.cache.list(path, fh)
 
-
     def release(self, path, fh):
         print("release", path, fh)
         # I think the file handle will be the one for the file in the cache?
         return os.close(fh)
 
-
     def flush(self, path, fh):
         print("flush", path, fh)
-        # I must wait with uploading a written file until the flush and fsync for it happened, right?
+        # I must wait with uploading a written file until the flush and fsync
+        # for it happened, right?
         # Or am I safe if I just upload *closed* files?
         return os.fsync(fh)
 
     def fsync(self, path, datasync, fh):
-        # I must wait with uploading a written file until the flush and fsync for it happened, right?
+        # I must wait with uploading a written file until the flush and fsync
+        # for it happened, right?
         # Or am I safe if I just upload *closed* files?
         print("fsync", path, fh)
         if datasync != 0:
             return os.fdatasync(fh)
         else:
             return os.fsync(fh)
-
 
     def create(self, path, mode):
         print("create", path, mode)
@@ -114,10 +127,19 @@ class Filesystem(Operations):
     @on_cache_path_or_dummy
     def statfs(self, path):
         cache_stat_info = os.statvfs(path)
-        stat_info =  {
-            key : getattr(cache_stat_info, key)  for key in (
-                'f_bavail', 'f_bfree', 'f_blocks', 'f_bsize', 'f_favail',
-                'f_ffree', 'f_files', 'f_flag', 'f_frsize', 'f_namemax'
+        stat_info = {
+            key: getattr(cache_stat_info, key)
+            for key in (
+                "f_bavail",
+                "f_bfree",
+                "f_blocks",
+                "f_bsize",
+                "f_favail",
+                "f_ffree",
+                "f_files",
+                "f_flag",
+                "f_frsize",
+                "f_namemax",
             )
         }
 
@@ -134,13 +156,12 @@ class Filesystem(Operations):
     def symlink(self, path, target):
         return os.symlink(target, path)
 
-
     @on_cache_path_enforce_local
     def truncate(self, path, length, fh=None):
-        with open(path, 'r+') as f:
+        with open(path, "r+") as f:
             f.truncate(length)
 
-    @on_cache_path_enforce_local 
+    @on_cache_path_enforce_local
     # dirs are always local
     def rmdir(self, *args, **kwargs):
         print("rmdir", args, kwargs)
