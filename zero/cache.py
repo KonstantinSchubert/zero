@@ -31,9 +31,7 @@ class Cache:
 
     def _strip_dummy_ending(self, cache_path):
         if self._is_dummy(cache_path):
-            num_characters_to_strip = len(self.anti_collision_hash) + len(
-                ending
-            )
+            num_characters_to_strip = len(self.anti_collision_hash + "dummy")
             return cache_path[:-num_characters_to_strip]
         else:
             return cache_path
