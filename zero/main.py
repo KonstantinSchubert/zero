@@ -3,6 +3,8 @@ import argparse
 
 from .operations import Filesystem
 from .cache import Cache
+from .worker import Worker
+from .paths import Converter
 from .b2_api import FileAPI
 
 
@@ -20,8 +22,10 @@ def main():
     api = FileAPI(
         account_info=None, account_id=None, application_key=None, bucket_id=None
     )
-    cache = Cache(args.cache_folder)
-    filesystem = Filesystem(api, cache)
+    converter = Converter(args.cache_folder)
+    worker = Worker(converter, api)
+    cache = Cache(converter, worker)
+    filesystem = Filesystem(cache)
     FUSE(
         filesystem, args.mountpoint, nothreads=True, foreground=True, debug=True
     )

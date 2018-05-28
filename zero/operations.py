@@ -18,8 +18,7 @@ class Filesystem(Operations):
     This is a bit of a fuzzy boundary that I am not really happy with.
     """
 
-    def __init__(self, api, cache):
-        self.api = api
+    def __init__(self, cache):
         self.cache = cache
         self.rwlock = Lock()
 
@@ -144,6 +143,8 @@ class Filesystem(Operations):
         }
 
         # Todo: Remove some keys from above's list and set them here
+        # Deal with the case that that path is a dummy and the case
+        # that it is not
         # stat_info[""]
 
         return stat_info
