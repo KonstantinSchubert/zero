@@ -56,7 +56,7 @@ class Cache:
         result = os.open(
             cache_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode
         )
-        self.state_store.set_dirty(cache_path)
+        self.state_store.set_dirty(path)
         return result
 
     def unlink(self, rwlock, cache_path):

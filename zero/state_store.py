@@ -43,7 +43,9 @@ class StateStore:
         )
 
     def set_clean(self, path):
-        self.remove(path, prev_states=[STATES.CLEANING], next_state=STATES.IDLE)
+        self._transition(
+            path, previous_states=[STATES.CLEANING], next_state=STATES.IDLE
+        )
 
     def set_todelete(self, path):
         self._transition(
@@ -62,7 +64,7 @@ class StateStore:
 
     def _transition(self, path, previous_states, next_state):
         # To make this class thread safe, obtain path-specific lock for this method.
-
+        print(f"{previous_states} -> {next_state}")
         if next_state is None:
             with self.connection:
                 self._assert_path_has_allowed_state(path, previous_states)
@@ -88,7 +90,9 @@ class StateStore:
         )
         if cursor.fetchone() is not None:
             return
-        raise Exception("None of the states match the state of the path")
+        raise Exception(
+            f"None of the states {states} match the state of the path"
+        )
 
     def _remove(self, path):
         self.connection.execute(
