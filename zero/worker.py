@@ -9,18 +9,13 @@ class Worker:
         self.state_store = StateStore()
 
     def _clean_path(self, path):
-        # Todo: Obtain path lock or make operation atomic in sqlite
-        if not self.state_store.is_dirty(path):
-            return
         self.state_store.set_cleaning(path)
-        # Todo: release path lock
         with open(self.converter.to_cache_path(path)) as file_to_upload:
-            self.api.upload(file_to_upload)
-        # Todo: Obtain path lock: or make operation atomic in sqlite
-        if self.state_store.is_cleaning:
-            self.state_store.remove(path)
+            self.api.upload(file_to_upload, path)
+        self.state_store.set_clean(path)
 
     def _delete_path(self, path):
         # Todo: Obtin path lock or make operation atomic in sqlite
-        if not self.state_store.is_todelete(path):
-            return
+        self.state_store.set_deleting(path)
+        self.api.delete(path)
+        self.state_store.set_deleted(path)
