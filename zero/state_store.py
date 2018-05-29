@@ -30,16 +30,29 @@ class StateStore:
         return self._path_has_state(path, STATES.DELETING)
 
     def set_dirty(self, path):
-        self._set_state_on_path(path, STATES.DIRTY)
+        self._insert_state_on_path(path, STATES.DIRTY)
 
     def set_cleaning(self, path):
-        self._set_state_on_path(path, STATES.CLEANING)
+        self._update_state_on_path(path, STATES.CLEANING, STATES.DIRTY)
 
     def set_todelete(self, path):
-        self._set_state_on_path(path, STATES.TODELETE)
+        self._insert_state_on_path(path, STATES.TODELETE)
 
     def set_deleting(self, path):
-        self._set_state_on_path(path, STATES.DELETING)
+        self._update_state_on_path(path, STATES.DELETING, STATES.TODELETE)
+
+    def set_clean(self, path):
+        self.remove(path, prev_state=STATES.CLEANING)
+
+    def set_deleted(self, path):
+        self.remove(path, prev_state=STATES.TODELETE)
+
+    def _remove(self, path, prev_state):
+        todo: check that the current state is the "prev state"
+        THis is basically a state transition from
+        self.connection.execute(
+            """DELETE from states WHERE nodepath = ?""", (path,)
+        )
 
     def _path_has_state(self, path, state):
         cursor = self.connection.execute(
@@ -48,9 +61,32 @@ class StateStore:
         )
         return cursor.fetchone() is None
 
-    def _set_state_on_path(self, path, state):
+    def _insert_state_on_path(self, path, state):
+        # This only works if row does not yet exist.
         with self.connection:
+
+            Todo: Check that inserting row does not yet exist.
+
             self.connection.execute(
-                """INSERT OR REPLACE INTO states (nodepath, state) VALUES (?, ?)""",
+                """INSERT INTO states (nodepath, state) VALUES (?, ?)""",
                 (path, state),
             )
+            # Raise error if not exactly one row affectd
+            # Because we are calling this within  the context manager,
+            # the count should refer to the above update.
+            count = self.connection.execute("""SELECT changes()""")
+            if not count == 1:
+                raise
+
+    def _update_state_on_path(self, path, state, prev_state):
+        # Perform a state transition
+        self.connection.execute(
+            """UPDATE states SET state = ? WHERE nodepath = ? AND state = ? """,
+            (state, path, prev_state),
+        )
+        # Raise error if not exactly one row affected
+        # Because we are calling this within  the context manager,
+        # the count should refer to the above update.
+        count = self.connection.execute("""SELECT changes()""")
+        if not count == 1:
+            raise

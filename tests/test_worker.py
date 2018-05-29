@@ -33,3 +33,4 @@ class WorkerTest(unittest.TestCase):
 
     def test_clean_file(self):
         self.worker._clean_path(SIMPLE_PATH)
+        self.worker._clean_path(SIMPLE_PATH)
