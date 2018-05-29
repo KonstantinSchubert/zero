@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 from zero.worker import Worker
 from zero.cache import Cache
-from zero.paths import Converter
+from zero.paths import PathConverter
 
 CACHE_DIR = "test_cache_dir/"
 SIMPLE_PATH = "yo"
@@ -26,7 +26,7 @@ class WorkerTest(unittest.TestCase):
         remove_recusive_silently("state.db")
         remove_recusive_silently(CACHE_DIR)
         os.mkdir(CACHE_DIR)
-        converter = Converter(CACHE_DIR)
+        converter = PathConverter(CACHE_DIR)
         self.worker = Worker(converter, api)
         self.cache = Cache(converter, self.worker)
         self.cache.create(SIMPLE_PATH, 33204)

@@ -19,13 +19,13 @@ class Cache:
         cache_path = self.converter.to_cache_path(fuse_path)
         if os.path.exists(cache_path):
             return cache_path
-        elif os.path.exists(self.converter.add_cache_ending(cache_path)):
+        elif os.path.exists(self.converter.add_dummy_ending(cache_path)):
             return cache_path + "dummy"
         return None
 
     def _get_path(self, fuse_path):
         cache_path = self.converter.to_cache_path(fuse_path)
-        if os.path.exists(cache_path + self.anti_collision_hash + "dummy"):
+        if os.path.exists(self.converter.add_dummy_ending(cache_path)):
             raise  # todo: implement this
             # synchronously download real file and replace dummy
         return cache_path
