@@ -4,8 +4,9 @@ import argparse
 from .operations import Filesystem
 from .cache import Cache
 from .worker import Worker
-from .paths import Converter
+from .paths import PathConverter
 from .b2_api import FileAPI
+from .b2_real_credentials import account_id, application_key, bucket_id
 
 
 def parse_args():
@@ -20,9 +21,11 @@ def main():
     args = parse_args()
 
     api = FileAPI(
-        account_info=None, account_id=None, application_key=None, bucket_id=None
+        account_id=account_id,
+        application_key=application_key,
+        bucket_id=bucket_id,
     )
-    converter = Converter(args.cache_folder)
+    converter = PathConverter(args.cache_folder)
     worker = Worker(converter, api)
     cache = Cache(converter, worker)
     filesystem = Filesystem(cache)
