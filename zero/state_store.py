@@ -64,7 +64,6 @@ class StateStore:
 
     def _transition(self, path, previous_states, next_state):
         # To make this class thread safe, obtain path-specific lock for this method.
-        print(f"{previous_states} -> {next_state}")
         if next_state is None:
             with self.connection:
                 self._assert_path_has_allowed_state(path, previous_states)

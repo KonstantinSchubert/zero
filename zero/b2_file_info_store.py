@@ -23,6 +23,4 @@ class FileInfoStore:
                 """SELECT file_id FROM b2_file_info WHERE identifier = ?""",
                 (identifier,),
             )
-        print(cursor.fetchone)
-        raise
-        return cursor.fetchone()
+        return cursor.fetchone()[0]

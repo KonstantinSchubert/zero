@@ -26,6 +26,11 @@ class B2APITest(unittest.TestCase):
     def test_upload_file(self):
         self._upload_file()
 
-    def test_delte_file(self):
+    def test_delete_file(self):
         self._upload_file()
         self.fileAPI.delete(TEST_PATH)
+
+    def test_download_file(self):
+        self._upload_file()
+        file = self.fileAPI.download(TEST_PATH)
+        assert file.read() == TEST_BINARY_DATA

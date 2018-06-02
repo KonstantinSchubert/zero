@@ -2,9 +2,11 @@
 The lifecycle settings on the bucket must be configured to
 'keep only the last version.
 """
+from io import BytesIO
 from b2.api import B2Api
 from b2.bucket import Bucket
 from b2.account_info.in_memory import InMemoryAccountInfo
+from b2.download_dest import DownloadDestBytes
 from .b2_file_info_store import FileInfoStore
 
 
@@ -27,3 +29,9 @@ class FileAPI:
     def delete(self, identifier):
         file_id = self.file_info_store.get_file_id(identifier)
         self.bucket_api.delete_file_version(file_id, identifier)
+
+    def download(self, identifier):
+        download_dest = DownloadDestBytes()
+        file_id = self.file_info_store.get_file_id(identifier)
+        self.bucket_api.download_file_by_id(file_id, download_dest)
+        return BytesIO(download_dest.get_bytes_written())
