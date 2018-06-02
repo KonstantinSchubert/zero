@@ -7,15 +7,10 @@ from zero.worker import Worker
 from zero.cache import Cache
 from zero.paths import PathConverter
 
+from .utils import remove_recursive_silently
+
 CACHE_DIR = "test_cache_dir/"
 SIMPLE_PATH = "yo"
-
-
-def remove_recusive_silently(path):
-    if os.path.isfile(path):
-        os.remove(path)
-    elif os.path.isdir(path):
-        shutil.rmtree(path)
 
 
 class WorkerTest(unittest.TestCase):
@@ -34,8 +29,8 @@ class WorkerTest(unittest.TestCase):
         self.reset()
 
     def reset(self):
-        remove_recusive_silently("state.db")
-        remove_recusive_silently(CACHE_DIR)
+        remove_recursive_silently("state.db")
+        remove_recursive_silently(CACHE_DIR)
 
     def test_clean_file(self):
         self.worker._clean_path(SIMPLE_PATH)

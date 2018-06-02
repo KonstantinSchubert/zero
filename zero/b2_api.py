@@ -1,6 +1,11 @@
+"""B2 file back-end.
+The lifecycle settings on the bucket must be configured to
+'keep only the last version.
+"""
 from b2.api import B2Api
 from b2.bucket import Bucket
 from b2.account_info.in_memory import InMemoryAccountInfo
+from .b2_file_info_store import FileInfoStore
 
 
 class FileAPI:
@@ -10,7 +15,15 @@ class FileAPI:
         self.api = B2Api(account_info)
         self.api.authorize_account("production", account_id, application_key)
         self.bucket_api = Bucket(self.api, bucket_id)
+        self.file_info_store = FileInfoStore()
 
     def upload(self, file, identifier):
         data = file.read()
-        self.bucket_api.upload_bytes(data, identifier)
+        file_info = self.bucket_api.upload_bytes(data, identifier)
+        self.file_info_store.set_file_id(
+            identifier, file_info.as_dict().get("fileId")
+        )
+
+    def delete(self, identifier):
+        file_id = self.file_info_store.get_file_id(identifier)
+        self.bucket_api.delete_file_version(file_id, identifier)
