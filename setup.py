@@ -15,5 +15,10 @@ setup(
     install_requires=["fusepy", "b2"],
     include_package_data=True,
     zip_safe=True,
-    entry_points={"console_scripts": ["zero = zero.main:main"]},
+    entry_points={
+        "console_scripts": [
+            "zero-fuse = zero.main:fuse_main",
+            "zero-worker = zero.main:worker_main",
+        ]
+    },
 )
