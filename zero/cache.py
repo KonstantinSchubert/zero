@@ -26,8 +26,7 @@ class Cache:
     def _get_path(self, fuse_path):
         cache_path = self.converter.to_cache_path(fuse_path)
         if os.path.exists(self.converter.add_dummy_ending(cache_path)):
-            raise  # todo: implement this
-            # synchronously download real file and replace dummy
+            self.worker.replace_dummy(fuse_path)
         return cache_path
 
     def _list_nodes_and_dummies(self, dir_path):
