@@ -1,3 +1,4 @@
+import os
 from .state_store import StateStore
 
 
@@ -26,21 +27,22 @@ class Worker:
         # Todo: should this function go to the Cache class and
         # instead of a worker I pass api to the cache class and an instance
         # of cache to the worker?
-        with open(path, "w+b") as file:
-            file.write(self.api.download(path))
-        os.remove(self.converter.add_dummy_ending(path))
-        print("hi")
+        cache_path = self.converter.to_cache_path(path)
+        with open(cache_path, "w+b") as file:
+            file.write(self.api.download(path).read())
+        os.remove(self.converter.add_dummy_ending(cache_path))
 
-    def create_dummy(self, path):
+    def _create_dummy(self, path):
         # Todo: Worry about settings permissions and timestamps
         # Todo: Worry about concurrency
         # Todo: should this function go to the Cache class and
         # instead of a worker I pass api to the cache class and an instance
         # of cache to the worker?
-        with open(path, "r+b") as file:
+        cache_path = self.converter.to_cache_path(path)
+        with open(cache_path, "r+b") as file:
             self.api.upload(file, path)
-        os.remove(path)
-        with open(self.converter.add_dummy_ending(path)) as dummy_file:
-            # Todo: set permissions and timestamps and stuff
-            # For now, just touch:
-            os.utime(dummy_file.fileno())
+        os.remove(cache_path)
+        os.open(
+            self.converter.add_dummy_ending(cache_path),
+            os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+        )
