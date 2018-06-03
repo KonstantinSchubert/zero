@@ -20,9 +20,15 @@ def main():
 
     args = parse_args()
 
+    api = FileAPI(
+        account_id=account_id,
+        application_key=application_key,
+        bucket_id=bucket_id,
+    )
+
     converter = PathConverter(args.cache_folder)
     cache = Cache(converter)
-    worker = Worker(cache)
+    worker = Worker(cachea, api)
     filesystem = Filesystem(cache)
     FUSE(
         filesystem, args.mountpoint, nothreads=True, foreground=True, debug=True

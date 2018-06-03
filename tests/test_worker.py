@@ -25,8 +25,8 @@ class WorkerTest(unittest.TestCase):
         os.mkdir(CACHE_DIR)
         self.converter = PathConverter(CACHE_DIR)
         self.cache = Cache(self.converter)
-        self.worker = Worker(self.cache)
-        self.worker.api = MagicMock()
+        self.api = MagicMock()
+        self.worker = Worker(self.cache, self.api)
         self.cache.create(PATH, 33204)
         with open(self.converter.to_cache_path(PATH), "w+b") as file:
             file.write(FILE_CONTENT)
@@ -51,7 +51,7 @@ class WorkerTest(unittest.TestCase):
     def test_replace_dummy(self):
         self.worker._create_dummy(PATH)
         self.worker.api.download.return_value = BytesIO(FILE_CONTENT)
-        self.worker.replace_dummy(PATH)
+        self.worker._replace_dummy(PATH)
         cache_path = self.converter.to_cache_path(PATH)
         assert not os.path.exists(self.converter.add_dummy_ending(cache_path))
         assert os.path.exists(cache_path)

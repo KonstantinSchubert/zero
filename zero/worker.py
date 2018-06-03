@@ -1,19 +1,16 @@
 import os
 from .state_store import StateStore
 from .b2_api import FileAPI
-from .b2_real_credentials import account_id, application_key, bucket_id
 
 
 class Worker:
 
-    def __init__(self, cache):
+    def __init__(self, cache, api):
+        self.api = api
+        # Todo: Write methods in the cache class which wrap the
+        # objects from the following two objects that I am using here
         self.converter = cache.converter
-        self.state_store = StateStore()
-        self.api = FileAPI(
-            account_id=account_id,
-            application_key=application_key,
-            bucket_id=bucket_id,
-        )
+        self.state_store = cache.state_store
 
     def _clean_path(self, path):
         self.state_store.set_cleaning(path)
@@ -22,12 +19,12 @@ class Worker:
         self.state_store.set_clean(path)
 
     def _delete_path(self, path):
-        # Todo: Obtin path lock or make operation atomic in sqlite
+        # Todo: Obtain path lock or make operation atomic in sqlite
         self.state_store.set_deleting(path)
         self.api.delete(path)
         self.state_store.set_deleted(path)
 
-    def replace_dummy(self, path):
+    def _replace_dummy(self, path):
         # Todo: Worry about settings permissions and timestamps
         # Todo: Worry about concurrency
         # Todo: should this function go to the Cache class and
@@ -52,3 +49,27 @@ class Worker:
             self.converter.add_dummy_ending(cache_path),
             os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
         )
+
+    def clean(self):
+        """Uplaod dirty files to remote"""
+        for path in self.state_store.get_dirty_paths():
+            self._clean_path(path)
+
+    def purge(self):
+        """Remove todelete files from remote"""
+        for path in self.state_store.get_todelete_paths():
+            self._delete_path(path)
+
+    def evict(self):
+        """Remove unneeded files from cache"""
+
+    def prime(self):
+        """Fill the cache with files from remote
+        that are predicted to be needed.
+        """
+
+    def run(self):
+        self.clean()
+        self.purge()
+        self.evict()
+        self.prime()

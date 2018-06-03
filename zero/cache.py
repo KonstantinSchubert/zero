@@ -25,12 +25,19 @@ class Cache:
 
     def _get_path(self, fuse_path):
         from .worker import Worker
+        from .b2_api import FileAPI
+        from .b2_real_credentials import account_id, application_key, bucket_id
 
         # Small composition inversion. Normal is that worker has cache.
         # This could also be solved with some kind of synchronous signal.
         cache_path = self.converter.to_cache_path(fuse_path)
         if os.path.exists(self.converter.add_dummy_ending(cache_path)):
-            Worker(self).replace_dummy(fuse_path)
+            api = FileAPI(
+                account_id=account_id,
+                application_key=application_key,
+                bucket_id=bucket_id,
+            )
+            Worker(self, api)._replace_dummy(fuse_path)
         return cache_path
 
     def _list_nodes_and_dummies(self, dir_path):
