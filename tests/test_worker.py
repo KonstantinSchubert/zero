@@ -21,12 +21,12 @@ class WorkerTest(unittest.TestCase):
 
     def setUp(self):
         # Todo mock this and pass fake data here (?)
-        self.api = MagicMock()
         self.reset()
         os.mkdir(CACHE_DIR)
         self.converter = PathConverter(CACHE_DIR)
-        self.worker = Worker(self.converter, self.api)
-        self.cache = Cache(self.converter, self.worker)
+        self.cache = Cache(self.converter)
+        self.worker = Worker(self.cache)
+        self.worker.api = MagicMock()
         self.cache.create(PATH, 33204)
         with open(self.converter.to_cache_path(PATH), "w+b") as file:
             file.write(FILE_CONTENT)
@@ -50,7 +50,7 @@ class WorkerTest(unittest.TestCase):
 
     def test_replace_dummy(self):
         self.worker._create_dummy(PATH)
-        self.api.download.return_value = BytesIO(FILE_CONTENT)
+        self.worker.api.download.return_value = BytesIO(FILE_CONTENT)
         self.worker.replace_dummy(PATH)
         cache_path = self.converter.to_cache_path(PATH)
         assert not os.path.exists(self.converter.add_dummy_ending(cache_path))

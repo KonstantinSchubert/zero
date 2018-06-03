@@ -5,9 +5,8 @@ from .state_store import StateStore
 
 class Cache:
 
-    def __init__(self, converter, worker):
+    def __init__(self, converter):
         self.converter = converter
-        self.worker = worker
         self.state_store = StateStore()
 
     def _get_path_or_dummy(self, fuse_path):
@@ -17,16 +16,21 @@ class Cache:
         In this case, return None
         """
         cache_path = self.converter.to_cache_path(fuse_path)
+        dummy_cache_path = self.converter.add_dummy_ending(cache_path)
         if os.path.exists(cache_path):
             return cache_path
-        elif os.path.exists(self.converter.add_dummy_ending(cache_path)):
-            return cache_path + "dummy"
+        elif os.path.exists(dummy_cache_path):
+            return dummy_cache_path
         return None
 
     def _get_path(self, fuse_path):
+        from .worker import Worker
+
+        # Small composition inversion. Normal is that worker has cache.
+        # This could also be solved with some kind of synchronous signal.
         cache_path = self.converter.to_cache_path(fuse_path)
         if os.path.exists(self.converter.add_dummy_ending(cache_path)):
-            self.worker.replace_dummy(fuse_path)
+            Worker(self).replace_dummy(fuse_path)
         return cache_path
 
     def _list_nodes_and_dummies(self, dir_path):
@@ -47,8 +51,9 @@ class Cache:
         # I think the file handle will be the one for the file in the cache?
         with rwlock:
             os.lseek(fh, offset, 0)
-            return os.write(fh, data)
-        # todo: add dirty file
+            result = os.write(fh, data)
+        self.state_store.set_dirty(path)
+        return result
 
     def create(self, path, mode):
         cache_path = self.converter.to_cache_path(path)

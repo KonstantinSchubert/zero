@@ -1,13 +1,19 @@
 import os
 from .state_store import StateStore
+from .b2_api import FileAPI
+from .b2_real_credentials import account_id, application_key, bucket_id
 
 
 class Worker:
 
-    def __init__(self, converter, api):
-        self.api = api
-        self.converter = converter
+    def __init__(self, cache):
+        self.converter = cache.converter
         self.state_store = StateStore()
+        self.api = FileAPI(
+            account_id=account_id,
+            application_key=application_key,
+            bucket_id=bucket_id,
+        )
 
     def _clean_path(self, path):
         self.state_store.set_cleaning(path)
