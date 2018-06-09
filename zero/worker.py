@@ -30,10 +30,12 @@ class Worker:
         # Todo: should this function go to the Cache class and
         # instead of a worker I pass api to the cache class and an instance
         # of cache to the worker?
+        # TODO: Do we need a self.state_store.seet_downlaoding()?
         cache_path = self.converter.to_cache_path(path)
         with open(cache_path, "w+b") as file:
             file.write(self.api.download(path).read())
         os.remove(self.converter.add_dummy_ending(cache_path))
+        self.state_store.set_downlaoded(path)
 
     def _create_dummy(self, path):
         # Todo: Worry about settings permissions and timestamps
@@ -41,6 +43,7 @@ class Worker:
         # Todo: should this function go to the Cache class and
         # instead of a worker I pass api to the cache class and an instance
         # of cache to the worker?
+        # TODO: Do we need a self.state_store.set_uploading()?
         cache_path = self.converter.to_cache_path(path)
         with open(cache_path, "r+b") as file:
             self.api.upload(file, path)
@@ -49,6 +52,7 @@ class Worker:
             self.converter.add_dummy_ending(cache_path),
             os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
         )
+        self.state_store.set_remote(path)
 
     def clean(self):
         """Uplaod dirty files to remote"""
@@ -62,11 +66,17 @@ class Worker:
 
     def evict(self):
         """Remove unneeded files from cache"""
+        # To decide which files to evict,
+        # join state table with rank table
+        # and look at files with low rank who are states.CLEAN
 
     def prime(self):
         """Fill the cache with files from remote
         that are predicted to be needed.
         """
+        # To decide which files to prime with,
+        # join state table with rank table and look at files with high
+        # rank who are states.REMOTE
 
     def run(self):
         self.clean()

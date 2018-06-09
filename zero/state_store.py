@@ -2,12 +2,14 @@ import sqlite3
 
 
 class STATES:
-    IDLE = "IDLE"
-    # NOt sure if IDLE is needed or I can just remmove the row (None) in this case
-    DIRTY = "DIRTY"
-    CLEANING = "CLEANING"
-    TODELETE = "TODELETE"
-    DELETING = "DELETING"
+    CLEAN = "CLEAN"  # File exists locally and remotely and is clean
+    REMOTE = "REMOTE"  # File exists only remotely
+    DIRTY = "DIRTY"  # File exists locally and is dirty
+    CLEANING = "CLEANING"  # File exists locally and is being uploaded
+    TODELETE = "TODELETE"  # File exists only remotely and should be deleted
+    DELETING = (
+        "DELETING"
+    )  # File exists only remotely and deletion is in progress
 
 
 class StateStore:
@@ -32,9 +34,19 @@ class StateStore:
     def is_deleting(self, path):
         return self._path_has_state(path, STATES.DELETING)
 
+    def set_remote(self, path):
+        return self._transition(
+            path, previous_states=[STATES.IDLE], next_state=STATES.REMOTE
+        )
+
+    def set_downloaded(self, path):
+        return self._transition(
+            path, previous_states=[STATES.REMOTE], next_state=STATES.CLEAN
+        )
+
     def set_dirty(self, path):
         self._transition(
-            path, previous_states=[STATES.IDLE, None], next_state=STATES.DIRTY
+            path, previous_states=[STATES.CLEAN, None], next_state=STATES.DIRTY
         )
 
     def set_cleaning(self, path):
@@ -44,7 +56,7 @@ class StateStore:
 
     def set_clean(self, path):
         self._transition(
-            path, previous_states=[STATES.CLEANING], next_state=STATES.IDLE
+            path, previous_states=[STATES.CLEANING], next_state=STATES.CLEAN
         )
 
     def set_todelete(self, path):
