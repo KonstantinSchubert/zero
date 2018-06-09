@@ -35,7 +35,7 @@ class Worker:
         with open(cache_path, "w+b") as file:
             file.write(self.api.download(path).read())
         os.remove(self.converter.add_dummy_ending(cache_path))
-        self.state_store.set_downlaoded(path)
+        self.state_store.set_downloaded(path)
 
     def _create_dummy(self, path):
         # Todo: Worry about settings permissions and timestamps

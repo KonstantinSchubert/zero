@@ -36,7 +36,7 @@ class StateStore:
 
     def set_remote(self, path):
         return self._transition(
-            path, previous_states=[STATES.IDLE], next_state=STATES.REMOTE
+            path, previous_states=[STATES.CLEAN], next_state=STATES.REMOTE
         )
 
     def set_downloaded(self, path):
