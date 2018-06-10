@@ -7,12 +7,14 @@ from unittest.mock import MagicMock
 from zero.worker import Worker
 from zero.cache import Cache
 from zero.paths import PathConverter
+from zero.state_store import StateStore
 
 from .utils import remove_recursive_silently
 
 CACHE_DIR = "test_cache_dir/"
 PATH = "yo"
 FILE_CONTENT = b"Some file content"
+DB_PATH = "state.db"
 
 
 class WorkerTest(unittest.TestCase):
@@ -22,7 +24,8 @@ class WorkerTest(unittest.TestCase):
         self._reset()
         os.mkdir(CACHE_DIR)
         self.converter = PathConverter(CACHE_DIR)
-        self.cache = Cache(self.converter)
+        state_store = StateStore(DB_PATH)
+        self.cache = Cache(self.converter, state_store)
         self.api = MagicMock()
         self.worker = Worker(self.cache, self.api)
         self._create_file()
@@ -51,7 +54,7 @@ class WorkerTest(unittest.TestCase):
         assert os.path.exists(cache_path)
 
     def _reset(self):
-        remove_recursive_silently("state.db")
+        remove_recursive_silently(DB_PATH)
         remove_recursive_silently(CACHE_DIR)
 
     def _create_file(self):

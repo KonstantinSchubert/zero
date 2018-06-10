@@ -3,6 +3,17 @@
 Fuse filesystem backed by cloud storage and transparent local persistent cache
 
 
+## Setup
+
+Create a config.yml:
+```
+accountId: [...]
+applicationKey: [...]
+bucketId: [...]
+sqliteFileLocation: [...]
+```
+and save in `~/.config/zero/`
+
 ## Architecture
 
 Not quite there yet, but here is a draft of the planned class diagram:

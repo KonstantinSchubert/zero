@@ -2,21 +2,30 @@ import unittest
 import io
 
 from zero.b2_api import FileAPI
-from zero.b2_real_credentials import account_id, application_key, bucket_id
+from zero.b2_file_info_store import FileInfoStore
+from zero.main import get_config
 
 from .utils import remove_recursive_silently
 
 
 TEST_BINARY_DATA = b"some _data"
 TEST_PATH = "home/kon/whatever/yo"
+DB_PATH = "state.db"
 
 
 class B2APITest(unittest.TestCase):
 
     def setUp(self):
         # Todo mock this and pass fake data here (?)
-        remove_recursive_silently("state.db")
-        self.fileAPI = FileAPI(account_id, application_key, bucket_id)
+        remove_recursive_silently(DB_PATH)
+        file_info_store = FileInfoStore(DB_PATH)
+        config = get_config()
+        self.fileAPI = FileAPI(
+            file_info_store=file_info_store,
+            account_id=config["accountId"],
+            application_key=config["applicationKey"],
+            bucket_id=config["bucketId"],
+        )
 
     def _upload_file(self):
         # Tested code expects a file object, but binary stream shoudl have sam eAPI.

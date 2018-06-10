@@ -12,12 +12,12 @@ from .b2_file_info_store import FileInfoStore
 
 class FileAPI:
 
-    def __init__(self, account_id, application_key, bucket_id):
+    def __init__(self, file_info_store, account_id, application_key, bucket_id):
         account_info = InMemoryAccountInfo()
         self.api = B2Api(account_info)
         self.api.authorize_account("production", account_id, application_key)
         self.bucket_api = Bucket(self.api, bucket_id)
-        self.file_info_store = FileInfoStore()
+        self.file_info_store = file_info_store
 
     def upload(self, file, identifier):
         data = file.read()

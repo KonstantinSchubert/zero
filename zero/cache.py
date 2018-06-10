@@ -1,13 +1,11 @@
 import os
 
-from .state_store import StateStore
-
 
 class Cache:
 
-    def __init__(self, converter):
+    def __init__(self, converter, state_store):
         self.converter = converter
-        self.state_store = StateStore()
+        self.state_store = state_store
 
     def _get_path_or_dummy(self, fuse_path):
         """Get cache path for given fuse_path.

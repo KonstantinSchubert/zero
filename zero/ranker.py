@@ -1,36 +1,35 @@
-import os
-from .state_store import StateStore
-from .b2_api import FileAPI
-
-
 class Ranker:
     """Ranks are stored in the rank table which is a table containing
     all paths in the filesystem as primary keys.
     """
 
-    def __init__(self):
-        pass
+    def __init__(self, rank_store):
+        self.rank_store = rank_store
 
-
-    def handle_access(path):
+    def handle_access(self, path):
         """Update ranking in reaction to the access event"""
         # Current algorithm is:
         # - Raise importance of accessed file by 3 points
-        # - Raise importance of files in the same directory
+        self.rank_store.change_rank_on_path(path, 3)
+        # Potential improvements:
+        # - Also raise importance of files in the same directory
         # and in directories above by 2 points
-        # - Raise importance of files in directories below
+        # - Also raise importance of files in directories below
         # the directory of the accessed file by 1 point
+        # We should also consider the form of access, whether the file
+        # was just ls-ted or read or written.
 
+    def handle_delete(self, path):
+        """Update ranking in reaction to a file being deleted"""
+        self.rank_store.remove_path(path)
 
-    def decay_rank(path):
-        # Rank points are remvoed periodically such that atfer
+    def decay_rank(self):
+        self.rank_store.apply_rank_factor(0.955)
+        # Rank is removed periodically such that atfer
         # 100 days, 90% of rank is lost. This works out to a
         # daily factor of 0.955 applied to all rank values.
 
-        # Since this method will not necessarily be run regularily,
-        # it should check when if it was last run more than a day ago
-        # and only apply the factor in this case
-
+        # This method is expected to be run from a daily cron job
         # This also means that if the program is not run, rank does not decay
         # Which seems right.
 

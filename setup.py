@@ -12,13 +12,14 @@ setup(
     keywords="",
     author="Konstantin Schubert",
     packages=find_packages(),
-    install_requires=["fusepy", "b2"],
+    install_requires=["fusepy", "b2", "pyyaml"],
     include_package_data=True,
     zip_safe=True,
     entry_points={
         "console_scripts": [
             "zero-fuse = zero.main:fuse_main",
             "zero-worker = zero.main:worker_main",
+            "decay-rank = zero.main:decay_rank",
         ]
     },
 )
