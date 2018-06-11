@@ -1,6 +1,7 @@
-from fuse import FUSE
 import argparse
+import time
 import yaml
+from fuse import FUSE
 from os.path import expanduser
 
 
@@ -39,7 +40,7 @@ def fuse_main():
     config = get_config()
 
     converter = PathConverter(args.cache_folder)
-    state_store = StateStore(config["sqliteFileLocation "])
+    state_store = StateStore(config["sqliteFileLocation"])
     cache = Cache(converter, state_store)
     filesystem = Filesystem(cache)
     FUSE(
@@ -64,7 +65,9 @@ def worker_main():
     state_store = StateStore(config["sqliteFileLocation"])
     cache = Cache(converter, state_store)
     worker = Worker(cache, api)
-    worker.run()
+    while True:
+        worker.run()
+        time.sleep(60)
 
 
 def decay_rank():

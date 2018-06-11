@@ -74,6 +74,19 @@ class StateStore:
     def set_deleted(self, path):
         self._transition(path, prev_states=[STATES.DELETING], next_state=None)
 
+    def get_dirty_paths(self):
+        with self.connection:
+            cursor = self.connection.execute(
+                """SELECT nodepath FROM states WHERE state = ?""",
+                (STATES.DIRTY,),
+            )
+            while True:
+                next_entry = cursor.fetchone()
+                if next_entry:
+                    yield next_entry[0]
+                else:
+                    break
+
     def _transition(self, path, previous_states, next_state):
         # To make this class thread safe, obtain path-specific lock for this method.
         if next_state is None:

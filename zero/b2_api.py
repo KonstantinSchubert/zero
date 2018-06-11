@@ -7,7 +7,6 @@ from b2.api import B2Api
 from b2.bucket import Bucket
 from b2.account_info.in_memory import InMemoryAccountInfo
 from b2.download_dest import DownloadDestBytes
-from .b2_file_info_store import FileInfoStore
 
 
 class FileAPI:
