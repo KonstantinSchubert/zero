@@ -46,7 +46,9 @@ class StateStore:
 
     def set_dirty(self, path):
         self._transition(
-            path, previous_states=[STATES.CLEAN, None], next_state=STATES.DIRTY
+            path,
+            previous_states=[STATES.CLEAN, STATES.DIRTY, STATES.TODELETE, None],
+            next_state=STATES.DIRTY,
         )
 
     def set_cleaning(self, path):
@@ -62,7 +64,7 @@ class StateStore:
     def set_todelete(self, path):
         self._transition(
             path,
-            previous_states=[STATES.IDLE, STATES.DIRTY],
+            previous_states=[STATES.CLEAN, STATES.DIRTY],
             next_state=STATES.TODELETE,
         )
 
@@ -75,10 +77,15 @@ class StateStore:
         self._transition(path, prev_states=[STATES.DELETING], next_state=None)
 
     def get_dirty_paths(self):
+        yield from self._get_paths_in_state(state=STATES.DIRTY)
+
+    def get_todelete_paths(self):
+        yield from self._get_paths_in_state(state=STATES.TODELETE)
+
+    def _get_paths_in_state(self, state):
         with self.connection:
             cursor = self.connection.execute(
-                """SELECT nodepath FROM states WHERE state = ?""",
-                (STATES.DIRTY,),
+                """SELECT nodepath FROM states WHERE state = ?""", (state,)
             )
             while True:
                 next_entry = cursor.fetchone()
@@ -100,34 +107,27 @@ class StateStore:
                 self._upsert_state_on_path(path, next_state)
 
     def _assert_path_has_allowed_state(self, path, states):
-
-        # None is an allowed value for a previous state
-        if None in states and not self._path_in_table(path):
-            return
-        not_none_states = [state for state in states if state is not None]
-        placeholders = ",".join(len(not_none_states) * ["?"])
         cursor = self.connection.execute(
-            """SELECT state FROM states WHERE nodepath = ? AND state IN ({placeholders})""".format(
-                placeholders=placeholders
-            ),
-            tuple([path] + not_none_states),
+            """SELECT state FROM states WHERE nodepath = ?""", (path,)
         )
-        if cursor.fetchone() is not None:
-            return
-        raise Exception(
-            f"None of the states {states} match the state of the path"
-        )
+        result = cursor.fetchone()
+        if result is None:
+            if None in states:
+                return
+            else:
+                raise Exception(
+                    f"None of the states {states} match the current state None of the path"
+                )
+        (current_state,) = result
+        if current_state not in states:
+            raise Exception(
+                f"None of the states {states} match the current state ({current_state})of the path"
+            )
 
     def _remove(self, path):
         self.connection.execute(
             """DELETE from states WHERE nodepath = ?""", (path,)
         )
-
-    def _path_in_table(self, path):
-        cursor = self.connection.execute(
-            """SELECT * FROM states WHERE nodepath = ?""", (path,)
-        )
-        return cursor.fetchone() is not None
 
     def _upsert_state_on_path(self, path, state):
         # This only works if row does not yet exist.

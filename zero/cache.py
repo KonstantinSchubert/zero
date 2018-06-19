@@ -78,7 +78,8 @@ class Cache:
                 cache_path_stripped = self.converter.strip_dummy_ending(
                     cache_path
                 )
-                self.state_store.set_todelete(cache_path_stripped)
+                fuse_path = self.converter.to_fuse_path(cache_path_stripped)
+                self.state_store.set_todelete(fuse_path)
 
     @staticmethod
     def is_link(cache_path):

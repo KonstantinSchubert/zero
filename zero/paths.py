@@ -15,6 +15,9 @@ class PathConverter:
         return self.cache_folder + fuse_path  # this is probably all wrong.
         # os.path.realpath or os.path.abspath might help
 
+    def to_fuse_path(self, cache_path):
+        return cache_path.replace(self.cache_folder, "")
+
     def is_dummy(self, cache_path):
         """
         Returns true if the file is a dummy file

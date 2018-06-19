@@ -1,6 +1,4 @@
 import os
-from .state_store import StateStore
-from .b2_api import FileAPI
 
 
 class Worker:
@@ -57,11 +55,13 @@ class Worker:
     def clean(self):
         """Uplaod dirty files to remote"""
         for path in self.state_store.get_dirty_paths():
+            print(f"Cleaning path {path}")
             self._clean_path(path)
 
     def purge(self):
         """Remove todelete files from remote"""
         for path in self.state_store.get_todelete_paths():
+            print(f"Deleting path {path}")
             self._delete_path(path)
 
     def evict(self):
@@ -79,6 +79,7 @@ class Worker:
         # rank who are states.REMOTE
 
     def run(self):
+        print("Running worker")
         self.clean()
         self.purge()
         self.evict()
