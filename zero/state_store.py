@@ -1,6 +1,10 @@
 import sqlite3
 
 
+class IllegalTransitionException(Exception):
+    pass
+
+
 class STATES:
     CLEAN = "CLEAN"  # File exists locally and remotely and is clean
     REMOTE = "REMOTE"  # File exists only remotely
@@ -47,7 +51,13 @@ class StateStore:
     def set_dirty(self, path):
         self._transition(
             path,
-            previous_states=[STATES.CLEAN, STATES.DIRTY, STATES.TODELETE, None],
+            previous_states=[
+                STATES.CLEAN,
+                STATES.CLEANING,
+                STATES.DIRTY,
+                STATES.TODELETE,
+                None,
+            ],
             next_state=STATES.DIRTY,
         )
 
@@ -64,7 +74,7 @@ class StateStore:
     def set_todelete(self, path):
         self._transition(
             path,
-            previous_states=[STATES.CLEAN, STATES.DIRTY],
+            previous_states=[STATES.CLEAN, STATES.CLEANING, STATES.DIRTY],
             next_state=STATES.TODELETE,
         )
 
@@ -120,7 +130,7 @@ class StateStore:
                 )
         (current_state,) = result
         if current_state not in states:
-            raise Exception(
+            raise IllegalTransitionException(
                 f"None of the states {states} match the current state ({current_state})of the path"
             )
 

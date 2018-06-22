@@ -18,16 +18,26 @@ class FileAPI:
         self.bucket_api = Bucket(self.api, bucket_id)
         self.file_info_store = file_info_store
 
+    def _encode_identifier(self, identifier):
+        return identifier[1:]
+
+    def _decode_identifier(self, identifier):
+        return "/" + identifier
+
     def upload(self, file, identifier):
         data = file.read()
-        file_info = self.bucket_api.upload_bytes(data, identifier)
+        file_info = self.bucket_api.upload_bytes(
+            data, self._encode_identifier(identifier)
+        )
         self.file_info_store.set_file_id(
             identifier, file_info.as_dict().get("fileId")
         )
 
     def delete(self, identifier):
         file_id = self.file_info_store.get_file_id(identifier)
-        self.bucket_api.delete_file_version(file_id, identifier)
+        self.bucket_api.delete_file_version(
+            file_id, self._encode_identifier(identifier)
+        )
 
     def download(self, identifier):
         download_dest = DownloadDestBytes()

@@ -1,4 +1,8 @@
+import logging
 import os
+from .state_store import IllegalTransitionException
+
+logger = logging.getLogger("spam_application")
 
 
 class Worker:
@@ -12,9 +16,12 @@ class Worker:
 
     def _clean_path(self, path):
         self.state_store.set_cleaning(path)
-        with open(self.converter.to_cache_path(path)) as file_to_upload:
+        with open(self.converter.to_cache_path(path), "rb") as file_to_upload:
             self.api.upload(file_to_upload, path)
-        self.state_store.set_clean(path)
+        try:
+            self.state_store.set_clean(path)
+        except IllegalTransitionException as e:
+            logger.info("Did not set path to clean because of: {e}")
 
     def _delete_path(self, path):
         # Todo: Obtain path lock or make operation atomic in sqlite
