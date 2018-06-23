@@ -7,28 +7,26 @@ class FileInfoStore:
         self.connection = sqlite3.connect(db_path, timeout=5)
         with self.connection:
             self.connection.execute(
-                """CREATE TABLE IF NOT EXISTS b2_file_info (identifier text primary key, file_id text)"""
+                """CREATE TABLE IF NOT EXISTS b2_file_info (inode text primary key, file_id text)"""
             )
 
-    def set_file_id(self, identifier, file_id):
+    def set_file_id(self, inode, file_id):
         with self.connection:
             self.connection.execute(
-                """INSERT OR REPLACE INTO b2_file_info (identifier, file_id) VALUES (?, ?)""",
-                (identifier, file_id),
+                """INSERT OR REPLACE INTO b2_file_info (inode, file_id) VALUES (?, ?)""",
+                (inode, file_id),
             )
 
-    def get_file_id(self, identifier):
+    def get_file_id(self, inode):
         with self.connection:
             cursor = self.connection.execute(
-                """SELECT file_id FROM b2_file_info WHERE identifier = ?""",
-                (identifier,),
+                """SELECT file_id FROM b2_file_info WHERE inode = ?""", (inode,)
             )
         result = cursor.fetchone()
         return result and result[0]
 
-    def remove_entry(self, identifier):
+    def remove_entry(self, inode):
         with self.connection:
             self.connection.execute(
-                """DELETE from b2_file_info WHERE identifier = ?""",
-                (identifier,),
+                """DELETE from b2_file_info WHERE inode = ?""", (inode,)
             )

@@ -7,6 +7,7 @@ from os.path import expanduser
 
 from .operations import Filesystem
 from .state_store import StateStore
+from .inode_store import InodeStore
 from .cache import Cache
 from .worker import Worker
 from .paths import PathConverter
@@ -41,7 +42,8 @@ def fuse_main():
 
     converter = PathConverter(args.cache_folder)
     state_store = StateStore(config["sqliteFileLocation"])
-    cache = Cache(converter, state_store)
+    inode_store = InodeStore(config["sqliteFileLocation"])
+    cache = Cache(converter, state_store, inode_store)
     filesystem = Filesystem(cache)
     FUSE(filesystem, args.mountpoint, nothreads=True, foreground=True)
 
@@ -61,7 +63,8 @@ def worker_main():
 
     converter = PathConverter(args.cache_folder)
     state_store = StateStore(config["sqliteFileLocation"])
-    cache = Cache(converter, state_store)
+    inode_store = InodeStore(config["sqliteFileLocation"])
+    cache = Cache(converter, state_store, inode_store)
     worker = Worker(cache, api)
     while True:
         worker.run()

@@ -19,29 +19,29 @@ class STATES:
 class StateStore:
     """ This class is NOT thread safe"""
 
-    def __init__(self, db_path):
-        self.connection = sqlite3.connect(db_path, timeout=5)
+    def __init__(self, db_inode):
+        self.connection = sqlite3.connect(db_inode, timeout=5)
         with self.connection:
             self.connection.execute(
-                """CREATE TABLE IF NOT EXISTS states (nodepath text primary key, state text)"""
+                """CREATE TABLE IF NOT EXISTS states (inode text primary key, state text)"""
             )
 
-    def set_remote(self, path):
+    def set_remote(self, inode):
         with self.connection:
             return self._transition(
-                path, previous_states=[STATES.CLEAN], next_state=STATES.REMOTE
+                inode, previous_states=[STATES.CLEAN], next_state=STATES.REMOTE
             )
 
-    def set_downloaded(self, path):
+    def set_downloaded(self, inode):
         with self.connection:
             return self._transition(
-                path, previous_states=[STATES.REMOTE], next_state=STATES.CLEAN
+                inode, previous_states=[STATES.REMOTE], next_state=STATES.CLEAN
             )
 
-    def set_dirty(self, path):
+    def set_dirty(self, inode):
         with self.connection:
             self._transition(
-                path,
+                inode,
                 previous_states=[
                     STATES.CLEAN,
                     STATES.CLEANING,
@@ -52,68 +52,77 @@ class StateStore:
                 next_state=STATES.DIRTY,
             )
 
-    def set_cleaning(self, path):
+    def set_cleaning(self, inode):
         with self.connection:
             self._transition(
-                path, previous_states=[STATES.DIRTY], next_state=STATES.CLEANING
+                inode,
+                previous_states=[STATES.DIRTY],
+                next_state=STATES.CLEANING,
             )
 
-    def set_clean(self, path):
+    def set_clean(self, inode):
         with self.connection:
             self._transition(
-                path, previous_states=[STATES.CLEANING], next_state=STATES.CLEAN
+                inode,
+                previous_states=[STATES.CLEANING],
+                next_state=STATES.CLEAN,
             )
 
-    def set_todelete(self, path):
+    def set_todelete(self, inode):
         with self.connection:
             self._transition(
-                path,
-                previous_states=[STATES.CLEAN, STATES.CLEANING, STATES.DIRTY],
+                inode,
+                previous_states=[
+                    STATES.CLEAN,
+                    STATES.CLEANING,
+                    STATES.DIRTY,
+                    STATES.TODELETE,
+                ],
                 next_state=STATES.TODELETE,
             )
 
-    def set_deleting(self, path):
+    def set_deleting(self, inode):
         with self.connection:
             self._transition(
-                path,
+                inode,
                 previous_states=[STATES.TODELETE],
                 next_state=STATES.DELETING,
             )
 
-    def set_deleted(self, path):
+    def set_deleted(self, inode):
         with self.connection:
             self._transition(
-                path, previous_states=[STATES.DELETING], next_state=None
+                inode, previous_states=[STATES.DELETING], next_state=None
             )
 
-    def get_dirty_paths(self):
-        yield from self.get_paths_in_state(state=STATES.DIRTY)
+    def get_dirty_inodes(self):
+        yield from self.get_inodes_in_state(state=STATES.DIRTY)
 
-    def get_todelete_paths(self):
-        yield from self.get_paths_in_state(state=STATES.TODELETE)
+    def get_todelete_inodes(self):
+        yield from self.get_inodes_in_state(state=STATES.TODELETE)
 
-    def get_paths_in_state(self, state):
+    def get_inodes_in_state(self, state):
         with self.connection:
             cursor = self.connection.execute(
-                """SELECT nodepath FROM states WHERE state = ?""", (state,)
+                """SELECT inode FROM states WHERE state = ?""", (state,)
             )
         entries = cursor.fetchall()
         for entry in entries:
             yield entry[0]
 
-    def _transition(self, path, previous_states, next_state):
-        # To make this class thread safe, obtain path-specific lock for this method.
+    def _transition(self, inode, previous_states, next_state):
+        # To make this class thread safe, obtain inode-specific lock for this method.
         if next_state is None:
-            self._assert_path_has_allowed_state(path, previous_states)
-            self._remove(path)
+            self._assert_inode_has_allowed_state(inode, previous_states)
+            self._remove(inode)
 
         else:
-            self._assert_path_has_allowed_state(path, previous_states)
-            self._upsert_state_on_path(path, next_state)
+            self._assert_inode_has_allowed_state(inode, previous_states)
+            self._upsert_state_on_inode(inode, next_state)
 
-    def _assert_path_has_allowed_state(self, path, states):
+    def _assert_inode_has_allowed_state(self, inode, states):
         cursor = self.connection.execute(
-            """SELECT state FROM states WHERE nodepath = ?""", (path,)
+            """SELECT state FROM states WHERE inode = ?""", (inode,)
         )
         result = cursor.fetchone()
         if result is None:
@@ -121,22 +130,22 @@ class StateStore:
                 return
             else:
                 raise Exception(
-                    f"None of the states {states} match the current state None of the path"
+                    f"None of the states {states} match the current state None of the inode"
                 )
         (current_state,) = result
         if current_state not in states:
             raise IllegalTransitionException(
-                f"None of the states {states} match the current state ({current_state})of the path"
+                f"None of the states {states} match the current state ({current_state})of the inode"
             )
 
-    def _remove(self, path):
+    def _remove(self, inode):
         self.connection.execute(
-            """DELETE from states WHERE nodepath = ?""", (path,)
+            """DELETE from states WHERE inode = ?""", (inode,)
         )
 
-    def _upsert_state_on_path(self, path, state):
+    def _upsert_state_on_inode(self, inode, state):
         # This only works if row does not yet exist.
         self.connection.execute(
-            """INSERT OR REPLACE INTO states (nodepath, state) VALUES (?, ?)""",
-            (path, state),
+            """INSERT OR REPLACE INTO states (inode, state) VALUES (?, ?)""",
+            (inode, state),
         )

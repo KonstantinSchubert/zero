@@ -3,9 +3,10 @@ import os
 
 class Cache:
 
-    def __init__(self, converter, state_store):
+    def __init__(self, converter, state_store, inode_store):
         self.converter = converter
         self.state_store = state_store
+        self.inode_store = inode_store
 
     def _get_path_or_dummy(self, fuse_path):
         """Get cache path for given fuse_path.
@@ -49,16 +50,13 @@ class Cache:
             for path in self._list_nodes_and_dummies(cache_dir_path)
         ]
 
-    def mkdir(self, fuse_path, mode):
-        cache_path = self.converter.to_cache_path(fuse_path)
-        os.mkdir(cache_path, mode)
-
     def write(self, rwlock, path, data, offset, fh):
         # I think the file handle will be the one for the file in the cache?
         with rwlock:
             os.lseek(fh, offset, 0)
             result = os.write(fh, data)
-        self.state_store.set_dirty(path)
+        inode = self.inode_store.get_inode(path)
+        self.state_store.set_dirty(inode)
         return result
 
     def create(self, path, mode):
@@ -66,7 +64,8 @@ class Cache:
         result = os.open(
             cache_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode
         )
-        self.state_store.set_dirty(path)
+        inode = self.inode_store.create_and_get_inode(path)
+        self.state_store.set_dirty(inode)
         return result
 
     def unlink(self, rwlock, cache_path):
@@ -78,7 +77,10 @@ class Cache:
                     cache_path
                 )
                 fuse_path = self.converter.to_fuse_path(cache_path_stripped)
-                self.state_store.set_todelete(fuse_path)
+                inode = self.inode_store.get_inode(fuse_path)
+                self.inode_store.delete_path(fuse_path)
+                # TODO: Only delete inode if no other paths are poinding to it.
+                self.state_store.set_todelete(inode)
 
     @staticmethod
     def is_link(cache_path):
