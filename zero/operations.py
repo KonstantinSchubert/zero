@@ -61,7 +61,6 @@ class Filesystem(Operations):
 
     def link(self, target, source):
         print("link")
-        print("RAISING NON IMPLEMENTED")
         # I can maintain a hard link table that basically lists for each path
         # the  "inode" number ( doesn't need to be the real inode number )
         # Then, whenever I replace a file with its dummy, I must consider this
@@ -69,7 +68,7 @@ class Filesystem(Operations):
         # the remote end I can even use "inode" number as keys for the files
         # that are uploaded. This does not solve hard links which point from
         # my file system to another file system or vice versa
-        raise
+        raise NotImplementedError
 
     listxattr = None
 
@@ -116,8 +115,7 @@ class Filesystem(Operations):
         return self.cache.create(path, mode)
 
     def rename(self, old, new):
-        print("RAISING NON IMPLEMENTED")
-        raise
+        raise NotImplementedError
 
     @on_cache_path_or_dummy
     def statfs(self, path):
@@ -174,8 +172,7 @@ class Filesystem(Operations):
         return self.cache.unlink(self.rwlock, path)
 
     def utimes(self, **kwargs):
-        print("RAISING NON IMPLEMENTED")
-        raise
+        raise NotImplementedError
 
     def write(self, path, data, offset, fh):
         print("write", path, offset, fh)
