@@ -5,7 +5,7 @@ class RankStore:
     """ This class is NOT thread safe"""
 
     def __init__(self, db_path):
-        self.connection = sqlite3.connect(db_path)
+        self.connection = sqlite3.connect(db_path, timeout=5)
         with self.connection:
             self.connection.execute(
                 """CREATE TABLE IF NOT EXISTS ranks (nodepath text primary key, state text)"""

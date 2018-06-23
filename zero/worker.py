@@ -49,6 +49,8 @@ class Worker:
         # instead of a worker I pass api to the cache class and an instance
         # of cache to the worker?
         # TODO: Do we need a self.state_store.set_uploading()?
+
+        # INSTEAD OF UPLOADING, MAKE SURE PATH IS CLEAN?
         cache_path = self.converter.to_cache_path(path)
         with open(cache_path, "r+b") as file:
             self.api.upload(file, path)

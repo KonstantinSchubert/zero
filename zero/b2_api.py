@@ -29,15 +29,24 @@ class FileAPI:
         file_info = self.bucket_api.upload_bytes(
             data, self._encode_identifier(identifier)
         )
+        print("trying to set file id")
         self.file_info_store.set_file_id(
             identifier, file_info.as_dict().get("fileId")
         )
 
     def delete(self, identifier):
         file_id = self.file_info_store.get_file_id(identifier)
+        if not file_id:
+            # No file ID means file was never synched to remote
+            print(
+                f"Not deleting {identifier} because no file_id in file info store"
+                f"Maybe file had never been synched to remote"
+            )
+            return
         self.bucket_api.delete_file_version(
             file_id, self._encode_identifier(identifier)
         )
+        self.file_info_store.remove_entry(identifier)
 
     def download(self, identifier):
         download_dest = DownloadDestBytes()

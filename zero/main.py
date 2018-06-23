@@ -67,7 +67,7 @@ def worker_main():
     worker = Worker(cache, api)
     while True:
         worker.run()
-        time.sleep(60)
+        time.sleep(10)
 
 
 def decay_rank():
