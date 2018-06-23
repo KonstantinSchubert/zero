@@ -52,7 +52,6 @@ class Cache:
     def mkdir(self, fuse_path, mode):
         cache_path = self.converter.to_cache_path(fuse_path)
         os.mkdir(cache_path, mode)
-        self.state_store.set_dirty(cache_path)
 
     def write(self, rwlock, path, data, offset, fh):
         # I think the file handle will be the one for the file in the cache?

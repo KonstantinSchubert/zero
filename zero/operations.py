@@ -73,10 +73,6 @@ class Filesystem(Operations):
 
     listxattr = None
 
-    def mkdir(self, path, mode):
-        print("mkdir", path, mode)
-        return self.cache.mkdir(path, mode)
-
     @on_cache_path_enforce_local
     def open(self, path, flags):
         return os.open(path, flags)
@@ -162,11 +158,15 @@ class Filesystem(Operations):
         with open(path, "r+") as f:
             f.truncate(length)
 
-    @on_cache_path_enforce_local
-    # dirs are always local
-    def rmdir(self, *args, **kwargs):
+    @on_cache_path
+    def mkdir(self, path, mode):
+        print("mkdir", path, mode)
+        return os.mkdir(path, mode)
+
+    @on_cache_path
+    def rmdir(self, path, *args, **kwargs):
         print("rmdir", args, kwargs)
-        return os.rmdir(*args, **kwargs)
+        return os.rmdir(path, *args, **kwargs)
 
     @on_cache_path_or_dummy
     def unlink(self, path):

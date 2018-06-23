@@ -43,9 +43,7 @@ def fuse_main():
     state_store = StateStore(config["sqliteFileLocation"])
     cache = Cache(converter, state_store)
     filesystem = Filesystem(cache)
-    FUSE(
-        filesystem, args.mountpoint, nothreads=True, foreground=True, debug=True
-    )
+    FUSE(filesystem, args.mountpoint, nothreads=True, foreground=True)
 
 
 def worker_main():
