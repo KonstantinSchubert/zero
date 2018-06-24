@@ -10,6 +10,10 @@ class InodeStore:
             self.connection.execute(
                 """CREATE TABLE IF NOT EXISTS inodes (nodepath text primary key, inode text)"""
             )
+            # Initialize sequence, needs refactoring
+            self.connection.execute(
+                """CREATE TABLE IF NOT EXISTS sequences (name text primary key, value integer)"""
+            )
 
     def create_and_get_inode(self, path):
         with self.connection:
@@ -40,14 +44,14 @@ class InodeStore:
 
     def _create_path(self, path, inode=None):
         if inode is None:
+            inode = self._get_inode_sequence()
             self.connection.execute(
                 # The problem is using max here is that I might re-use
                 # old values if the old max is removed. Better would be
                 # a sequence as it is supported by postgresql
-                """INSERT INTO inodes (nodepath, inode)
-                VALUES (?, (SELECT IFNULL(MAX(inode), 0) + 1 FROM inodes))
+                """INSERT INTO inodes (nodepath, inode) VALUES (?, ?)
                 """,
-                (path,),
+                (path, inode),
             )
         else:
             self.connection.execute(
@@ -67,4 +71,21 @@ class InodeStore:
             """SELECT inode FROM inodes WHERE nodepath = ?""", (path,)
         )
         result = cursor.fetchone()
+        # TODO: Why is the "or 0" here? Looks like it's not needed?
         return result and result[0] or 0
+
+    def _get_inode_sequence(self):
+        cursor = self.connection.execute(
+            """SELECT value FROM sequences WHERE name='inode_sequence'"""
+        )
+        result = cursor.fetchone()
+        value = result and result[0]
+        if value is None:
+            self.connection.execute(
+                """INSERT INTO sequences (name, value) VALUES ('inode_sequence', 1)"""
+            )
+            value = 1
+        self.connection.execute(
+            """UPDATE sequences SET value=value+1 WHERE name='inode_sequence'"""
+        )
+        return value
