@@ -3,10 +3,12 @@ import os
 
 class Cache:
 
-    def __init__(self, converter, state_store, inode_store):
+    def __init__(self, converter, state_store, inode_store, ranker):
         self.converter = converter
         self.state_store = state_store
         self.inode_store = inode_store
+        self.ranker = ranker
+        # instead of passing an instance here, sending a signal to the worker process might be more robust
 
     def _get_path_or_dummy(self, fuse_path):
         """Get cache path for given fuse_path.
@@ -52,6 +54,7 @@ class Cache:
 
     def write(self, rwlock, path, data, offset, fh):
         # I think the file handle will be the one for the file in the cache?
+        self.ranker.handle_path_access(path)
         with rwlock:
             os.lseek(fh, offset, 0)
             result = os.write(fh, data)
@@ -60,6 +63,7 @@ class Cache:
         return result
 
     def create(self, path, mode):
+        self.ranker.handle_path_access(path)
         cache_path = self.converter.to_cache_path(path)
         result = os.open(
             cache_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode
@@ -79,15 +83,15 @@ class Cache:
         with rwlock:
             is_link = self.is_link(cache_path)
             os.unlink(cache_path)
-            if not is_link:
-                cache_path_stripped = self.converter.strip_dummy_ending(
-                    cache_path
-                )
-                fuse_path = self.converter.to_fuse_path(cache_path_stripped)
-                inode = self.inode_store.get_inode(fuse_path)
-                self.inode_store.delete_path(fuse_path)
-                # TODO: Only delete inode if no other paths are poinding to it.
-                self.state_store.set_todelete(inode)
+            if is_link:
+                return
+            cache_path_stripped = self.converter.strip_dummy_ending(cache_path)
+            fuse_path = self.converter.to_fuse_path(cache_path_stripped)
+            inode = self.inode_store.get_inode(fuse_path)
+            self.inode_store.delete_path(fuse_path)
+            # TODO: Only delete inode if no other paths are poinding to it.
+            self.ranker.handle_inode_delete(inode)
+            self.state_store.set_todelete(inode)
 
     @staticmethod
     def is_link(cache_path):

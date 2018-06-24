@@ -3,14 +3,16 @@ class Ranker:
     all paths in the filesystem as primary keys.
     """
 
-    def __init__(self, rank_store):
+    def __init__(self, rank_store, inode_store):
         self.rank_store = rank_store
+        self.inode_store = inode_store
 
-    def handle_access(self, path):
+    def handle_path_access(self, path):
         """Update ranking in reaction to the access event"""
         # Current algorithm is:
-        # - Raise importance of accessed file by 3 points
-        self.rank_store.change_rank_on_path(path, 3)
+        # - Raise importance of accessed path's inode by 3 points
+        inode = self.inode_store.get_inode(path)
+        self.rank_store.change_rank_on_inode(inode, 3)
         # Potential improvements:
         # - Also raise importance of files in the same directory
         # and in directories above by 2 points
@@ -19,9 +21,9 @@ class Ranker:
         # We should also consider the form of access, whether the file
         # was just ls-ted or read or written.
 
-    def handle_delete(self, path):
+    def handle_inode_delete(self, inode):
         """Update ranking in reaction to a file being deleted"""
-        self.rank_store.remove_path(path)
+        self.rank_store.remove_inode(inode)
 
     def decay_rank(self):
         self.rank_store.apply_rank_factor(0.955)
