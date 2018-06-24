@@ -21,7 +21,6 @@ class FileAPI:
     def upload(self, file, inode):
         data = file.read()
         file_info = self.bucket_api.upload_bytes(data, inode)
-        print("trying to set file id")
         self.file_info_store.set_file_id(
             inode, file_info.as_dict().get("fileId")
         )

@@ -21,6 +21,10 @@ class Ranker:
         # We should also consider the form of access, whether the file
         # was just ls-ted or read or written.
 
+        # TODO: PROBLEM IS THAT BIG FILES HAVE MANY READS/WRITES
+        # AND EACH READ/WRITE INCREASES THEIR RANK.
+        # WE COULD MAYBE NORMALIZE BY FILE SIZE.
+
     def handle_inode_delete(self, inode):
         """Update ranking in reaction to a file being deleted"""
         self.rank_store.remove_inode(inode)

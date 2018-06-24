@@ -36,27 +36,46 @@ class StateStore:
 
         def __enter__(self):
             # Lock database while setting lock
-            for _ in range(self.acquisition_max_retries + 1):
-                with self.state_store.connection:
-                    if not self.state_store._is_locked(self.inode):
-                        self.state_store._lock(self.inode)
-                        print(f"locked {self.inode}")
-                        return
-                time.sleep(0.1)  # 100 ms
+            if self._try_locking():
+                return
+            for counter in range(self.acquisition_max_retries):
+                time.sleep(1.)
+                # 1000 ms - We wait this long because a big upload might be locking
+                # TODO: Reduce likelihood of huge uploads locking.
+                # For example, when big files are written, the worker should avoid uploading
+                # while the files is still being written. This is not a stric rule, more of a performence consideration
+                if self._try_locking():
+                    return
             raise InodeLockedException
 
         def __exit__(self, *args):
             with self.state_store.connection:
                 assert self.state_store._is_locked(self.inode)
                 self.state_store._unlock(self.inode)
+                print(f"unlocked {self.inode}")
+
+        def _try_locking(self):
+            print("TRY LOCKING")
+            with self.state_store.connection:
+                # We must disallow any other process from even reading the
+                # lock situation before we read and then change the lock situation
+                self.state_store.connection.execute("""BEGIN IMMEDIATE""")
+                if not self.state_store._is_locked(self.inode):
+                    self.state_store._lock(self.inode)
+                    print(f"locked {self.inode}")
+                    return True
+                return False
 
     def _is_locked(self, inode):
         cursor = self.connection.execute(
             """SELECT locked FROM states WHERE inode = ? """, (inode,)
         )
-        result = cursor.fetchone()[0]
-        assert result in [0, 1]
-        return bool(result)
+        result = cursor.fetchone()
+        if result is None:
+            # This happens when the inode gets deleted by the worker
+            print("Inode not found, thus counted as locked")
+            return True
+        return bool(result[0])
 
     def _lock(self, inode):
         self.connection.execute(

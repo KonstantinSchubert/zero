@@ -60,7 +60,7 @@ class Cache:
         print("trying to lock")
         self.ranker.handle_path_access(path)
         with self.state_store.Lock(
-            self.state_store, inode, acquisition_max_retries=10
+            self.state_store, inode, acquisition_max_retries=100
         ):
             print("managed to lock")
             os.lseek(fh, offset, 0)
@@ -71,7 +71,7 @@ class Cache:
         self.ranker.handle_path_access(path)
         inode = self.inode_store.get_inode(path)
         with self.state_store.Lock(
-            self.state_store, inode, acquisition_max_retries=10
+            self.state_store, inode, acquisition_max_retries=100
         ):
             os.lseek(fh, offset, 0)
             result = os.write(fh, data)
