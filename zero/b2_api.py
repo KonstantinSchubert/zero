@@ -31,8 +31,8 @@ class FileAPI:
         if not file_id:
             # No file ID means file was never synched to remote
             print(
-                f"Not deleting {inode} because no file_id in file info store"
-                f"Maybe file had never been synched to remote"
+                f"Not deleting {inode} because no file_id in file info store. "
+                f"Maybe had never been synched to remote"
             )
             return
         self.bucket_api.delete_file_version(file_id, inode)

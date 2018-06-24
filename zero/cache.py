@@ -68,6 +68,13 @@ class Cache:
         self.state_store.set_dirty(inode)
         return result
 
+    def rename(self, old_path, new_path):
+        self.inode_store.change_path(old_path, new_path)
+        return os.rename(
+            self.converter.to_cache_path(old_path),
+            self.converter.to_cache_path(new_path),
+        )
+
     def unlink(self, rwlock, cache_path):
         with rwlock:
             is_link = self.is_link(cache_path)

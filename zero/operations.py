@@ -115,6 +115,8 @@ class Filesystem(Operations):
         return self.cache.create(path, mode)
 
     def rename(self, old, new):
+        print(f"called rename {old} -> {new}")
+        return self.cache.rename(old, new)
         raise NotImplementedError
 
     @on_cache_path_or_dummy
