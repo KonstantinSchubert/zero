@@ -1,7 +1,12 @@
 import sqlite3
+import time
 
 
 class IllegalTransitionException(Exception):
+    pass
+
+
+class InodeLockedException(Exception):
     pass
 
 
@@ -9,11 +14,7 @@ class STATES:
     CLEAN = "CLEAN"  # File exists locally and remotely and is clean
     REMOTE = "REMOTE"  # File exists only remotely
     DIRTY = "DIRTY"  # File exists locally and is dirty
-    CLEANING = "CLEANING"  # File exists locally and is being uploaded
     TODELETE = "TODELETE"  # File exists only remotely and should be deleted
-    DELETING = (
-        "DELETING"
-    )  # File exists only remotely and deletion is in progress
 
 
 class StateStore:
@@ -23,8 +24,49 @@ class StateStore:
         self.connection = sqlite3.connect(db_inode, timeout=5)
         with self.connection:
             self.connection.execute(
-                """CREATE TABLE IF NOT EXISTS states (inode text primary key, state text)"""
+                """CREATE TABLE IF NOT EXISTS states (inode text primary key, state text, locked boolean default 0)"""
             )
+
+    class Lock:
+
+        def __init__(self, state_store, inode, acquisition_max_retries=0):
+            self.acquisition_max_retries = acquisition_max_retries
+            self.inode = inode
+            self.state_store = state_store
+
+        def __enter__(self):
+            # Lock database while setting lock
+            for _ in range(self.acquisition_max_retries + 1):
+                with self.state_store.connection:
+                    if not self.state_store._is_locked(self.inode):
+                        self.state_store._lock(self.inode)
+                        print(f"locked {self.inode}")
+                        return
+                time.sleep(0.1)  # 100 ms
+            raise InodeLockedException
+
+        def __exit__(self, *args):
+            with self.state_store.connection:
+                assert self.state_store._is_locked(self.inode)
+                self.state_store._unlock(self.inode)
+
+    def _is_locked(self, inode):
+        cursor = self.connection.execute(
+            """SELECT locked FROM states WHERE inode = ? """, (inode,)
+        )
+        result = cursor.fetchone()[0]
+        assert result in [0, 1]
+        return bool(result)
+
+    def _lock(self, inode):
+        self.connection.execute(
+            """UPDATE states SET locked = 1 WHERE inode = ?""", (inode,)
+        )
+
+    def _unlock(self, inode):
+        self.connection.execute(
+            """UPDATE states SET locked = 0 WHERE inode = ?""", (inode,)
+        )
 
     def set_remote(self, inode):
         with self.connection:
@@ -44,7 +86,6 @@ class StateStore:
                 inode,
                 previous_states=[
                     STATES.CLEAN,
-                    STATES.CLEANING,
                     STATES.DIRTY,
                     STATES.TODELETE,
                     None,
@@ -52,47 +93,24 @@ class StateStore:
                 next_state=STATES.DIRTY,
             )
 
-    def set_cleaning(self, inode):
-        with self.connection:
-            self._transition(
-                inode,
-                previous_states=[STATES.DIRTY],
-                next_state=STATES.CLEANING,
-            )
-
     def set_clean(self, inode):
         with self.connection:
             self._transition(
-                inode,
-                previous_states=[STATES.CLEANING],
-                next_state=STATES.CLEAN,
+                inode, previous_states=[STATES.DIRTY], next_state=STATES.CLEAN
             )
 
     def set_todelete(self, inode):
         with self.connection:
             self._transition(
                 inode,
-                previous_states=[
-                    STATES.CLEAN,
-                    STATES.CLEANING,
-                    STATES.DIRTY,
-                    STATES.TODELETE,
-                ],
+                previous_states=[STATES.CLEAN, STATES.DIRTY, STATES.TODELETE],
                 next_state=STATES.TODELETE,
-            )
-
-    def set_deleting(self, inode):
-        with self.connection:
-            self._transition(
-                inode,
-                previous_states=[STATES.TODELETE],
-                next_state=STATES.DELETING,
             )
 
     def set_deleted(self, inode):
         with self.connection:
             self._transition(
-                inode, previous_states=[STATES.DELETING], next_state=None
+                inode, previous_states=[STATES.TODELETE], next_state=None
             )
 
     def get_dirty_inodes(self):
@@ -143,9 +161,13 @@ class StateStore:
             """DELETE from states WHERE inode = ?""", (inode,)
         )
 
-    def _upsert_state_on_inode(self, inode, state):
-        # This only works if row does not yet exist.
+    def _update_state_on_inode(self, inode, state):
+        # Inserts row if it does not exist
         self.connection.execute(
-            """INSERT OR REPLACE INTO states (inode, state) VALUES (?, ?)""",
+            """INSERT OR IGNORE INTO states (inode, state) VALUES (?, ?)""",
             (inode, state),
+        )
+        # Updates row to have right state (redundant if prev. statement was executed)
+        self.connection.execute(
+            """UPDATE states SET state = ? WHERE inode = ?""", (state, inode)
         )

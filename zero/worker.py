@@ -1,6 +1,6 @@
 import logging
 import os
-from .state_store import IllegalTransitionException
+from .state_store import InodeLockedException
 
 logger = logging.getLogger("spam_application")
 
@@ -16,20 +16,19 @@ class Worker:
         self.inode_store = cache.inode_store
 
     def _clean_inode(self, inode):
-        self.state_store.set_cleaning(inode)
-        path = self.inode_store.get_paths(inode)[0]
-        with open(self.converter.to_cache_path(path), "rb") as file_to_upload:
-            self.api.upload(file_to_upload, inode)
-        try:
+        with self.state_store.Lock(self.state_store, inode):
+            path = self.inode_store.get_paths(inode)[0]
+            with open(
+                self.converter.to_cache_path(path), "rb"
+            ) as file_to_upload:
+                self.api.upload(file_to_upload, inode)
             self.state_store.set_clean(inode)
-        except IllegalTransitionException as e:
-            logger.info("Did not set inode to clean because of: {e}")
 
     def _delete_inode(self, inode):
         # Todo: Obtain inode lock or make operation atomic in sqlite
-        self.state_store.set_deleting(inode)
-        self.api.delete(inode)
-        self.state_store.set_deleted(inode)
+        with self.state_store.Lock(self.state_store, inode):
+            self.api.delete(inode)
+            self.state_store.set_deleted(inode)
 
     def _replace_dummy(self, inode):
         # Todo: Worry about settings permissions and timestamps
@@ -69,13 +68,19 @@ class Worker:
         """Uplaod dirty files to remote"""
         for inode in self.state_store.get_dirty_inodes():
             print(f"Cleaning inode {inode}")
-            self._clean_inode(inode)
+            try:
+                self._clean_inode(inode)
+            except InodeLockedException:
+                print("Could not clean: {inode} is locked")
 
     def purge(self):
         """Remove todelete files from remote"""
         for inode in self.state_store.get_todelete_inodes():
             print(f"Deleting inode {inode}")
-            self._delete_inode(inode)
+            try:
+                self._delete_inode(inode)
+            except InodeLockedException:
+                print("Could not delete: {inode} is locked")
 
     def evict(self):
         """Remove unneeded files from cache"""

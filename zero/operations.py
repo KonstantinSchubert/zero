@@ -77,12 +77,7 @@ class Filesystem(Operations):
         return os.open(path, flags)
 
     def read(self, path, size, offset, fh):
-        print("read", path, size, offset, fh)
-        # I think the file handle will be the one for the file in the cache,
-        # right?
-        with self.rwlock:
-            os.lseek(fh, offset, 0)
-            return os.read(fh, size)
+        return self.cache.read(path, size, offset, fh)
 
     @on_cache_path_enforce_local
     def readdir(self, path, fh):

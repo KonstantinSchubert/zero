@@ -17,7 +17,7 @@ class RankStore:
                 """SELECT rank FROM ranks WHERE inode = ?""", (inode,)
             )
             result = cursor.fetchone()
-            rank = result and result[0] or 0
+            rank = result and float(result[0]) or 0
             self._set_rank_on_path(inode, rank + rank_delta)
 
     def remove_inode(self, inode):
