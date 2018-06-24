@@ -20,7 +20,6 @@ class Filesystem(Operations):
 
     def __init__(self, cache):
         self.cache = cache
-        self.rwlock = Lock()
 
     @on_cache_path_or_dummy
     def access(self, path, mode):
@@ -166,11 +165,11 @@ class Filesystem(Operations):
     @on_cache_path_or_dummy
     def unlink(self, path):
         print("unlink")
-        return self.cache.unlink(self.rwlock, path)
+        return self.cache.unlink(path)
 
     def utimes(self, **kwargs):
         raise NotImplementedError
 
     def write(self, path, data, offset, fh):
         print("write", path, offset, fh)
-        return self.cache.write(self.rwlock, path, data, offset, fh)
+        return self.cache.write(path, data, offset, fh)

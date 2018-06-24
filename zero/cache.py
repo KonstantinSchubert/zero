@@ -58,6 +58,7 @@ class Cache:
         inode = self.inode_store.get_inode(path)
         print(path, inode)
         print("trying to lock")
+        self.ranker.handle_path_access(path)
         with self.state_store.Lock(
             self.state_store, inode, acquisition_max_retries=10
         ):
@@ -65,7 +66,7 @@ class Cache:
             os.lseek(fh, offset, 0)
             return os.read(fh, size)
 
-    def write(self, rwlock, path, data, offset, fh):
+    def write(self, path, data, offset, fh):
         # I think the file handle will be the one for the file in the cache?
         self.ranker.handle_path_access(path)
         inode = self.inode_store.get_inode(path)
@@ -94,7 +95,7 @@ class Cache:
             self.converter.to_cache_path(new_path),
         )
 
-    def unlink(self, rwlock, cache_path):
+    def unlink(self, cache_path):
         is_link = self.is_link(cache_path)
         if is_link:
             os.unlink(cache_path)
@@ -103,8 +104,9 @@ class Cache:
             fuse_path = self.converter.to_fuse_path(cache_path_stripped)
             inode = self.inode_store.get_inode(fuse_path)
             with self.state_store.Lock(
-                self.state_store, inode, acqisition_max_retries=10
+                self.state_store, inode, acquisition_max_retries=10
             ):
+                os.unlink(cache_path)
                 self.inode_store.delete_path(fuse_path)
                 # TODO: Only delete inode if no other paths are poinding to it.
                 self.ranker.handle_inode_delete(inode)

@@ -21,14 +21,16 @@ class RankStore:
             self._set_rank_on_path(inode, rank + rank_delta)
 
     def remove_inode(self, inode):
-        self.connection.execute(
-            """DELETE from ranks WHERE inode = ?""", (inode,)
-        )
+        with self.connection:
+            self.connection.execute(
+                """DELETE from ranks WHERE inode = ?""", (inode,)
+            )
 
     def apply_rank_factor(self, factor):
-        self.connection.execute(
-            """UPDATE rank SET Quantity = Quantity * ?""", (factor,)
-        )
+        with self.connection:
+            self.connection.execute(
+                """UPDATE rank SET Quantity = Quantity * ?""", (factor,)
+            )
 
     def _set_rank_on_path(self, inode, rank):
         with self.connection:

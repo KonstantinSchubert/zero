@@ -161,7 +161,7 @@ class StateStore:
             """DELETE from states WHERE inode = ?""", (inode,)
         )
 
-    def _update_state_on_inode(self, inode, state):
+    def _upsert_state_on_inode(self, inode, state):
         # Inserts row if it does not exist
         self.connection.execute(
             """INSERT OR IGNORE INTO states (inode, state) VALUES (?, ?)""",
