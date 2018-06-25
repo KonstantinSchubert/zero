@@ -20,7 +20,7 @@ class FileAPI:
 
     def upload(self, file, inode):
         data = file.read()
-        file_info = self.bucket_api.upload_bytes(data, inode)
+        file_info = self.bucket_api.upload_bytes(data, str(inode))
         self.file_info_store.set_file_id(
             inode, file_info.as_dict().get("fileId")
         )
@@ -34,7 +34,7 @@ class FileAPI:
                 f"Maybe had never been synched to remote"
             )
             return
-        self.bucket_api.delete_file_version(file_id, inode)
+        self.bucket_api.delete_file_version(file_id, int(inode))
         self.file_info_store.remove_entry(inode)
 
     def download(self, inode):

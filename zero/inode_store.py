@@ -8,7 +8,7 @@ class InodeStore:
         self.connection = sqlite3.connect(db_path, timeout=5)
         with self.connection:
             self.connection.execute(
-                """CREATE TABLE IF NOT EXISTS inodes (nodepath text primary key, inode text)"""
+                """CREATE TABLE IF NOT EXISTS inodes (nodepath text primary key, inode integer)"""
             )
             # Initialize sequence, needs refactoring
             self.connection.execute(
@@ -71,8 +71,7 @@ class InodeStore:
             """SELECT inode FROM inodes WHERE nodepath = ?""", (path,)
         )
         result = cursor.fetchone()
-        # TODO: Why is the "or 0" here? Looks like it's not needed?
-        return result and result[0] or 0
+        return result and result[0]
 
     def _get_inode_sequence(self):
         cursor = self.connection.execute(

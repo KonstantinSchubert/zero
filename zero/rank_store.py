@@ -8,7 +8,7 @@ class RankStore:
         self.connection = sqlite3.connect(db_path, timeout=5)
         with self.connection:
             self.connection.execute(
-                """CREATE TABLE IF NOT EXISTS ranks (inode text primary key, rank text)"""
+                """CREATE TABLE IF NOT EXISTS ranks (inode integer primary key, rank real)"""
             )
 
     def change_rank_on_inode(self, inode, rank_delta):
@@ -31,6 +31,15 @@ class RankStore:
             self.connection.execute(
                 """UPDATE ranks SET rank = rank * ?""", (factor,)
             )
+
+    def get_clean_and_low_rank_inodes(self, limit):
+        with self.connection:
+            cursor = self.connection.execute(
+                """SELECT ranks.inode FROM ranks INNER JOIN states on ranks.inode=states.inode WHERE states.state = 'CLEAN' ORDER BY ranks.rank ASC LIMIT ? """,
+                (limit,),
+            )
+            results = cursor.fetchall()
+        return [int(result[0]) for result in results]
 
     def _set_rank_on_path(self, inode, rank):
         with self.connection:

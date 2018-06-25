@@ -7,11 +7,10 @@ class Ranker:
         self.rank_store = rank_store
         self.inode_store = inode_store
 
-    def handle_path_access(self, path):
+    def handle_inode_access(self, inode):
         """Update ranking in reaction to the access event"""
         # Current algorithm is:
         # - Raise importance of accessed path's inode by 3 points
-        inode = self.inode_store.get_inode(path)
         self.rank_store.change_rank_on_inode(inode, 3)
         # Potential improvements:
         # - Also raise importance of files in the same directory
@@ -40,3 +39,6 @@ class Ranker:
         # Which seems right.
 
         # An alternative may be to deay rank by number of file accesses instead of by time.
+
+    def get_eviction_candidates(self, limit):
+        return self.rank_store.get_clean_and_low_rank_inodes(limit)

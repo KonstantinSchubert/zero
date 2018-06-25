@@ -24,7 +24,7 @@ class StateStore:
         self.connection = sqlite3.connect(db_inode, timeout=5)
         with self.connection:
             self.connection.execute(
-                """CREATE TABLE IF NOT EXISTS states (inode text primary key, state text, locked boolean default 0)"""
+                """CREATE TABLE IF NOT EXISTS states (inode integer primary key, state text, locked boolean default 0)"""
             )
 
     class Lock:

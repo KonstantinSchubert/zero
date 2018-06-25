@@ -56,9 +56,7 @@ class Cache:
 
     def read(self, path, size, offset, fh):
         inode = self.inode_store.get_inode(path)
-        print(path, inode)
-        print("trying to lock")
-        self.ranker.handle_path_access(path)
+        self.ranker.handle_inode_access(inode)
         with self.state_store.Lock(
             self.state_store, inode, acquisition_max_retries=100
         ):
@@ -68,7 +66,6 @@ class Cache:
 
     def write(self, path, data, offset, fh):
         # I think the file handle will be the one for the file in the cache?
-        self.ranker.handle_path_access(path)
         inode = self.inode_store.get_inode(path)
         with self.state_store.Lock(
             self.state_store, inode, acquisition_max_retries=100
@@ -76,16 +73,17 @@ class Cache:
             os.lseek(fh, offset, 0)
             result = os.write(fh, data)
             self.state_store.set_dirty(inode)
+        self.ranker.handle_inode_access(inode)
         return result
 
     def create(self, path, mode):
-        self.ranker.handle_path_access(path)
         cache_path = self.converter.to_cache_path(path)
         result = os.open(
             cache_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode
         )
         inode = self.inode_store.create_and_get_inode(path)
         self.state_store.set_dirty(inode)
+        self.ranker.handle_inode_access(inode)
         return result
 
     def rename(self, old_path, new_path):

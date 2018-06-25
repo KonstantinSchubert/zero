@@ -7,7 +7,7 @@ class FileInfoStore:
         self.connection = sqlite3.connect(db_path, timeout=5)
         with self.connection:
             self.connection.execute(
-                """CREATE TABLE IF NOT EXISTS b2_file_info (inode text primary key, file_id text)"""
+                """CREATE TABLE IF NOT EXISTS b2_file_info (inode integer primary key, file_id text)"""
             )
 
     def set_file_id(self, inode, file_id):

@@ -14,6 +14,7 @@ class Worker:
         self.converter = cache.converter
         self.state_store = cache.state_store
         self.inode_store = cache.inode_store
+        self.ranker = cache.ranker
 
     def _clean_inode(self, inode):
         with self.state_store.Lock(self.state_store, inode):
@@ -87,6 +88,9 @@ class Worker:
         # To decide which files to evict,
         # join state table with rank table
         # and look at files with low rank who are states.CLEAN
+        evictees = self.ranker.get_eviction_candidates(2)
+        print(evictees)
+        # TODO EVICT
 
     def prime(self):
         """Fill the cache with files from remote
