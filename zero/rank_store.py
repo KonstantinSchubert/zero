@@ -29,7 +29,7 @@ class RankStore:
     def apply_rank_factor(self, factor):
         with self.connection:
             self.connection.execute(
-                """UPDATE rank SET Quantity = Quantity * ?""", (factor,)
+                """UPDATE ranks SET rank = rank * ?""", (factor,)
             )
 
     def _set_rank_on_path(self, inode, rank):
