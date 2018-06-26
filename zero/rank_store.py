@@ -41,6 +41,15 @@ class RankStore:
             results = cursor.fetchall()
         return [int(result[0]) for result in results]
 
+    def get_remote_and_high_rank_inodes(self, limit):
+        with self.connection:
+            cursor = self.connection.execute(
+                """SELECT ranks.inode FROM ranks INNER JOIN states on ranks.inode=states.inode WHERE states.state = 'REMOTE' ORDER BY ranks.rank DESC LIMIT ? """,
+                (limit,),
+            )
+            results = cursor.fetchall()
+        return [int(result[0]) for result in results]
+
     def _set_rank_on_path(self, inode, rank):
         with self.connection:
 
@@ -48,3 +57,24 @@ class RankStore:
                 """INSERT OR REPLACE INTO ranks (inode, rank) VALUES (?, ?)""",
                 (inode, rank),
             )
+
+    def ranks_are_sorted(self):
+        with self.connection:
+            cursor = self.connection.execute(
+                """SELECT ranks.rank FROM ranks INNER JOIN states on ranks.inode=states.inode WHERE states.state = 'REMOTE' ORDER BY ranks.rank DESC LIMIT 1 """
+            )
+            results = cursor.fetchone()
+            highest_remote_rank = results and results[0]
+
+            cursor = self.connection.execute(
+                """SELECT ranks.rank FROM ranks INNER JOIN states on ranks.inode=states.inode WHERE states.state = 'CLEAN' ORDER BY ranks.rank ASC LIMIT 1 """
+            )
+            results = cursor.fetchone()
+            lowest_cache_rank = results and results[0]
+        if (
+            highest_remote_rank
+            and lowest_cache_rank
+            and highest_remote_rank > lowest_cache_rank
+        ):
+            return False
+        return True

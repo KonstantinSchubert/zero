@@ -42,3 +42,14 @@ class Ranker:
 
     def get_eviction_candidates(self, limit):
         return self.rank_store.get_clean_and_low_rank_inodes(limit)
+
+    def get_priming_candidates(self, limit):
+        return self.rank_store.get_remote_and_high_rank_inodes(limit)
+
+    def is_sufficiently_sorted(self):
+        """Return true the files in cache are the highest ranking files.
+        It is possible to allow for some leniency here in order to have
+        some more stability towards fast rank changes
+        """
+        # For now, check for the "hard" condition: Completely sorted
+        return self.rank_store.ranks_are_sorted()

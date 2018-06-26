@@ -4,6 +4,8 @@ from .state_store import InodeLockedException
 
 logger = logging.getLogger("spam_application")
 
+TARGET_DISK_USAGE = 10  # GB
+
 
 class Worker:
 
@@ -83,26 +85,44 @@ class Worker:
             except InodeLockedException:
                 print("Could not delete: {inode} is locked")
 
-    def evict(self):
+    def evict(self, number_of_files):
         """Remove unneeded files from cache"""
         # To decide which files to evict,
         # join state table with rank table
         # and look at files with low rank who are states.CLEAN
-        evictees = self.ranker.get_eviction_candidates(2)
+        evictees = self.ranker.get_eviction_candidates(number_of_files)
         print(evictees)
-        # TODO EVICT
+        # TODO: EVICT
 
-    def prime(self):
+    def prime(self, number_of_files):
         """Fill the cache with files from remote
         that are predicted to be needed.
         """
         # To decide which files to prime with,
         # join state table with rank table and look at files with high
         # rank who are states.REMOTE
+        primees = self.ranker.get_priming_candidates(number_of_files)
+        print(primees)
+        # TODO: Prime
+
+    def order_cache(self):
+        # TODO: Make sure that biggest file < 0.1 * target_disk_usage, else this won't work.
+        if (
+            abs(self.disk_usage - TARGET_DISK_USAGE)
+            < 3 * self.size_of_biggest_file
+            and self.ranker.is_sufficiently_sorted()
+        ):
+            return
+        elif self.disk_usage > TARGET_DISK_USAGE:
+            # If I want to evice and prime with a higher number
+            # of files then I need to make sure I don't overshoot,
+            # so I have to get slower as I approach the boundary
+            self.evict(1)
+        else:
+            self.prime(1)
 
     def run(self):
         print("Running worker")
         self.clean()
         self.purge()
-        self.evict()
-        self.prime()
+        self.order_cache()
