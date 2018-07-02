@@ -2,7 +2,6 @@ import os
 
 import errno
 from fuse import FuseOSError, Operations
-from threading import Lock
 
 from .cache import (
     on_cache_path,
@@ -172,4 +171,4 @@ class Filesystem(Operations):
 
     def write(self, path, data, offset, fh):
         print("write", path, offset, fh)
-        return self.cache.write(path, data, offset, fh)
+        return self.cache.write(self.rwlock, path, data, offset, fh)

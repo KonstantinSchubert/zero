@@ -1,10 +1,12 @@
 import logging
 import os
 from .state_store import InodeLockedException
+import subprocess
 
 logger = logging.getLogger("spam_application")
 
-TARGET_DISK_USAGE = 10  # GB
+
+TARGET_DISK_USAGE = 0.1  # GB
 
 
 class Worker:
@@ -17,6 +19,21 @@ class Worker:
         self.state_store = cache.state_store
         self.inode_store = cache.inode_store
         self.ranker = cache.ranker
+
+    def get_size_of_biggest_file(self):
+        """In GB"""
+        # TODO: Implement this. Will need to keep track of this via a table
+        return 0.01
+
+    def get_disk_usage(self):
+        """Returns cache disk use in GB"""
+        path = self.converter.to_cache_path("/")
+        du_output = (
+            subprocess.check_output(["du", "-s", path])
+            .split()[0]
+            .decode("utf-8")
+        )
+        return float(du_output) / (1000 * 1000)
 
     def _clean_inode(self, inode):
         with self.state_store.Lock(self.state_store, inode):
@@ -74,7 +91,7 @@ class Worker:
             try:
                 self._clean_inode(inode)
             except InodeLockedException:
-                print("Could not clean: {inode} is locked")
+                print(f"Could not clean: {inode} is locked")
 
     def purge(self):
         """Remove todelete files from remote"""
@@ -83,7 +100,7 @@ class Worker:
             try:
                 self._delete_inode(inode)
             except InodeLockedException:
-                print("Could not delete: {inode} is locked")
+                print(f"Could not delete: {inode} is locked")
 
     def evict(self, number_of_files):
         """Remove unneeded files from cache"""
@@ -108,17 +125,22 @@ class Worker:
     def order_cache(self):
         # TODO: Make sure that biggest file < 0.1 * target_disk_usage, else this won't work.
         if (
-            abs(self.disk_usage - TARGET_DISK_USAGE)
-            < 3 * self.size_of_biggest_file
+            abs(self.get_disk_usage() - TARGET_DISK_USAGE)
+            < 3 * self.get_size_of_biggest_file()
             and self.ranker.is_sufficiently_sorted()
         ):
+            print(
+                "Cache has the right size and is filled with the right files."
+            )
             return
-        elif self.disk_usage > TARGET_DISK_USAGE:
+        elif self.get_disk_usage() > TARGET_DISK_USAGE:
             # If I want to evice and prime with a higher number
             # of files then I need to make sure I don't overshoot,
             # so I have to get slower as I approach the boundary
+            print("Evicting")
             self.evict(1)
         else:
+            print("Priming")
             self.prime(1)
 
     def run(self):
