@@ -1,6 +1,6 @@
 import logging
 import os
-from .state_store import InodeLockedException
+from .locking import InodeLockedException, InodeLock
 import subprocess
 
 logger = logging.getLogger("spam_application")
@@ -36,7 +36,7 @@ class Worker:
         return float(du_output) / (1000 * 1000)
 
     def _clean_inode(self, inode):
-        with self.state_store.Lock(self.state_store, inode):
+        with InodeLock(inode):
             path = self.inode_store.get_paths(inode)[0]
             with open(
                 self.converter.to_cache_path(path), "rb"
@@ -46,7 +46,7 @@ class Worker:
 
     def _delete_inode(self, inode):
         # Todo: Obtain inode lock or make operation atomic in sqlite
-        with self.state_store.Lock(self.state_store, inode):
+        with InodeLock(inode):
             self.api.delete(inode)
             self.state_store.set_deleted(inode)
 

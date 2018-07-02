@@ -1,4 +1,5 @@
 import os
+from .locking import InodeLock
 
 
 class Cache:
@@ -55,11 +56,11 @@ class Cache:
     # Instead of wrapping the lock around each read/write operation, should I rather wrap it around the "open" operation?
 
     def read(self, path, size, offset, fh):
+        print("path in cache", path)
         inode = self.inode_store.get_inode(path)
         self.ranker.handle_inode_access(inode)
-        with self.state_store.Lock(
-            self.state_store, inode, acquisition_max_retries=100
-        ):
+        print("inode in cache", inode)
+        with InodeLock(inode, acquisition_max_retries=100):
             print("managed to lock")
             os.lseek(fh, offset, 0)
             return os.read(fh, size)
@@ -67,9 +68,7 @@ class Cache:
     def write(self, path, data, offset, fh):
         # I think the file handle will be the one for the file in the cache?
         inode = self.inode_store.get_inode(path)
-        with self.state_store.Lock(
-            self.state_store, inode, acquisition_max_retries=100
-        ):
+        with InodeLock(inode, acquisition_max_retries=100):
             os.lseek(fh, offset, 0)
             result = os.write(fh, data)
             self.state_store.set_dirty(inode)
@@ -101,9 +100,7 @@ class Cache:
             cache_path_stripped = self.converter.strip_dummy_ending(cache_path)
             fuse_path = self.converter.to_fuse_path(cache_path_stripped)
             inode = self.inode_store.get_inode(fuse_path)
-            with self.state_store.Lock(
-                self.state_store, inode, acquisition_max_retries=10
-            ):
+            with InodeLock(inode, acquisition_max_retries=10):
                 os.unlink(cache_path)
                 self.inode_store.delete_path(fuse_path)
                 # TODO: Only delete inode if no other paths are poinding to it.

@@ -34,7 +34,7 @@ class FileAPI:
                 f"Maybe had never been synched to remote"
             )
             return
-        self.bucket_api.delete_file_version(file_id, int(inode))
+        self.bucket_api.delete_file_version(file_id, str(inode))
         self.file_info_store.remove_entry(inode)
 
     def download(self, inode):

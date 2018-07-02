@@ -75,6 +75,7 @@ class Filesystem(Operations):
         return os.open(path, flags)
 
     def read(self, path, size, offset, fh):
+        print("read", path)
         return self.cache.read(path, size, offset, fh)
 
     @on_cache_path_enforce_local
@@ -171,4 +172,4 @@ class Filesystem(Operations):
 
     def write(self, path, data, offset, fh):
         print("write", path, offset, fh)
-        return self.cache.write(self.rwlock, path, data, offset, fh)
+        return self.cache.write(path, data, offset, fh)

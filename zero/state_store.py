@@ -24,7 +24,11 @@ class StateStore:
         self.connection = sqlite3.connect(db_inode, timeout=5)
         with self.connection:
             self.connection.execute(
-                """CREATE TABLE IF NOT EXISTS states (inode integer primary key, state text, locked boolean default 0)"""
+                """CREATE TABLE IF NOT EXISTS states (inode integer primary key, state text)"""
+            )
+        with self.connection:
+            self.connection.execute(
+                """CREATE TABLE IF NOT EXISTS locks (inode integer primary key)"""
             )
 
     class Lock:
@@ -50,6 +54,7 @@ class StateStore:
 
         def __exit__(self, *args):
             with self.state_store.connection:
+                self.state_store.connection.execute("""BEGIN IMMEDIATE""")
                 assert self.state_store._is_locked(self.inode)
                 self.state_store._unlock(self.inode)
                 print(f"unlocked {self.inode}")
@@ -68,23 +73,18 @@ class StateStore:
 
     def _is_locked(self, inode):
         cursor = self.connection.execute(
-            """SELECT locked FROM states WHERE inode = ? """, (inode,)
+            """SELECT * FROM locks WHERE inode = ? """, (inode,)
         )
-        result = cursor.fetchone()
-        if result is None:
-            # This happens when the inode gets deleted by the worker
-            print("Inode not found, thus counted as locked")
-            return True
-        return bool(result[0])
+        return cursor.fetchone() is not None
 
     def _lock(self, inode):
         self.connection.execute(
-            """UPDATE states SET locked = 1 WHERE inode = ?""", (inode,)
+            """INSERT INTO locks (inode) VALUES (?)""", (inode,)
         )
 
     def _unlock(self, inode):
         self.connection.execute(
-            """UPDATE states SET locked = 0 WHERE inode = ?""", (inode,)
+            """DELETE FROM locks WHERE inode = ?""", (inode,)
         )
 
     def set_remote(self, inode):
