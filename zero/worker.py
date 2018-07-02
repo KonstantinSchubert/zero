@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 from .locking import InodeLockedException, InodeLock
 import subprocess
 
@@ -36,12 +37,17 @@ class Worker:
         return float(du_output) / (1000 * 1000)
 
     def _clean_inode(self, inode):
-        with InodeLock(inode):
+        with InodeLock(inode) as lock:
             path = self.inode_store.get_paths(inode)[0]
             with open(
                 self.converter.to_cache_path(path), "rb"
             ) as file_to_upload:
-                self.api.upload(file_to_upload, inode)
+                upload_process = self.api.upload(file_to_upload, inode)
+                while upload_process.ongoing:
+                     if lock.abort_requested():
+                        upload_process.abort()
+                        return
+                    time.sleep(0.01)
             self.state_store.set_clean(inode)
 
     def _delete_inode(self, inode):
