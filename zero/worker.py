@@ -9,7 +9,7 @@ from multiprocessing import Process
 logger = logging.getLogger("spam_application")
 
 
-TARGET_DISK_USAGE = 0.1  # GB
+TARGET_DISK_USAGE = 0.01  # GB
 
 
 def upload(api, file_to_upload, inode):
@@ -32,7 +32,7 @@ class Worker:
     def get_size_of_biggest_file(self):
         """In GB"""
         # TODO: Implement this. Will need to keep track of this via a table
-        return 0.01
+        return 0.0025
 
     def get_disk_usage(self):
         """Returns cache disk use in GB"""
@@ -135,7 +135,7 @@ class Worker:
         # and look at files with low rank who are states.CLEAN
         evictees = self.ranker.get_eviction_candidates(number_of_files)
         print(evictees)
-        # TODO: EVICT
+        TODO: EVICT
 
     def prime(self, number_of_files):
         """Fill the cache with files from remote
@@ -152,17 +152,23 @@ class Worker:
         # TODO: Make sure that biggest file < 0.1 * target_disk_usage, else this won't work.
         if (
             abs(self.get_disk_usage() - TARGET_DISK_USAGE)
-            < 3 * self.get_size_of_biggest_file()
+            < 1.2 * self.get_size_of_biggest_file()
             and self.ranker.is_sufficiently_sorted()
         ):
             print(
-                "Cache has the right size and is filled with the right files."
+                f"""Cache has the right size and is filled with the right files.
+                Current disk usage {self.get_disk_usage()}
+                Target disk usage {TARGET_DISK_USAGE}
+                Tolerance {1.2 * self.get_size_of_biggest_file()}
+                """
             )
             return
         elif self.get_disk_usage() > TARGET_DISK_USAGE:
-            # If I want to evice and prime with a higher number
+            # If I want to evict and prime with a higher number
             # of files then I need to make sure I don't overshoot,
             # so I have to get slower as I approach the boundary
+            # or increase the tolerance to a higher multiple of the
+            # biggest file
             print("Evicting")
             self.evict(1)
         else:
