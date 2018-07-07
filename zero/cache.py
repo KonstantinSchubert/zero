@@ -4,17 +4,18 @@ from .locking import InodeLock
 
 class Cache:
 
-    def __init__(self, converter, state_store, inode_store, ranker):
+    def __init__(self, converter, state_store, inode_store, ranker, api):
         self.converter = converter
         self.state_store = state_store
         self.inode_store = inode_store
         self.ranker = ranker
+        self.api = api
         # instead of passing an instance here, sending a signal to the worker process might be more robust
 
     def _get_path_or_dummy(self, fuse_path):
         """Get cache path for given fuse_path.
         If it is a file and file is not in cache, return path to dummy file.
-        If there is no diummy file either, then the file does not exist.
+        If there is no dummy file either, then the file does not exist.
         In this case, return None
         """
         cache_path = self.converter.to_cache_path(fuse_path)
@@ -26,22 +27,12 @@ class Cache:
         return None
 
     def _get_path(self, fuse_path):
-        from .worker import Worker
-        from .b2_api import FileAPI
-        from .main import get_config
-
-        config = get_config()
 
         # Small composition inversion. Normal is that worker has cache.
         # This could also be solved with some kind of synchronous signal.
         cache_path = self.converter.to_cache_path(fuse_path)
         if os.path.exists(self.converter.add_dummy_ending(cache_path)):
-            api = FileAPI(
-                account_id=config["accountId"],
-                application_key=config["applicationKey"],
-                bucket_id=config["bucketId"],
-            )
-            Worker(self, api)._replace_dummy(fuse_path)
+            self._replace_dummy(fuse_path)
         return cache_path
 
     def _list_nodes_and_dummies(self, dir_path):
@@ -53,25 +44,44 @@ class Cache:
             for path in self._list_nodes_and_dummies(cache_dir_path)
         ]
 
-    # Instead of wrapping the lock around each read/write operation, should I rather wrap it around the "open" operation?
+    def open(self, path, flags):
+        print(f"CACHE: open {path}")
+        with InodeLock(
+            self.inode_store.get_inode(path),
+            self,
+            high_priority=True,
+            acquisition_max_retries=100,
+        ):
+            cache_path = self._get_path(path)
+            print(cache_path)
+            return os.open(cache_path, flags)
 
     def read(self, path, size, offset, fh):
+        print(f"CACHE: read {path}")
+        # No need to obtain lock because file is open
         inode = self.inode_store.get_inode(path)
         self.ranker.handle_inode_access(inode)
-        with InodeLock(inode, acquisition_max_retries=100, high_priority=True):
-            # TODO: Need to lock before the "assert is downloaded"
-            # wrapper because else worker might evict file before locking
-            os.lseek(fh, offset, 0)
-            return os.read(fh, size)
+        os.lseek(fh, offset, 0)
+        return os.read(fh, size)
+
+    def truncate(self, path, length):
+        inode = self.inode_store.get_inode(path)
+        with InodeLock(
+            inode, self, high_priority=True, acquisition_max_retries=100
+        ):
+            cache_path = self._get_path(path)
+            self.state_store.set_dirty(inode)
+            self.ranker.handle_inode_access(inode)
+            with open(cache_path, "r+") as f:
+                return f.truncate(length)
 
     def write(self, path, data, offset, fh):
-        # I think the file handle will be the one for the file in the cache?
+        # No need to obtain lock because file is open
         inode = self.inode_store.get_inode(path)
-        with InodeLock(inode, acquisition_max_retries=100, high_priority=True):
-            os.lseek(fh, offset, 0)
-            result = os.write(fh, data)
-            self.state_store.set_dirty(inode)
         self.ranker.handle_inode_access(inode)
+        os.lseek(fh, offset, 0)
+        result = os.write(fh, data)
+        self.state_store.set_dirty(inode)
         return result
 
     def create(self, path, mode):
@@ -100,7 +110,7 @@ class Cache:
             fuse_path = self.converter.to_fuse_path(cache_path_stripped)
             inode = self.inode_store.get_inode(fuse_path)
             with InodeLock(
-                inode, acquisition_max_retries=10, high_priority=True
+                inode, self, acquisition_max_retries=10, high_priority=True
             ):
                 os.unlink(cache_path)
                 self.inode_store.delete_path(fuse_path)
@@ -111,6 +121,34 @@ class Cache:
     @staticmethod
     def is_link(cache_path):
         return os.path.islink(cache_path)
+
+    def _replace_dummy(self, inode):
+        # Todo: Worry about settings permissions and timestamps
+
+        with InodeLock(inode, self):
+            path = self.inode_store.get_paths(inode)[0]
+            cache_path = self.converter.to_cache_path(path)
+            with open(cache_path, "w+b") as file:
+                file.write(self.api.download(inode).read())
+            os.remove(self.converter.add_dummy_ending(cache_path))
+            self.state_store.set_downloaded(inode)
+
+    def _create_dummy(self, inode):
+        # Todo: Worry about settings permissions and timestamps
+        with InodeLock(inode, self):
+            path = self.inode_store.get_paths(inode)[0]
+            cache_path = self.converter.to_cache_path(path)
+            if not self.state_store.is_clean(inode):
+                print(
+                    "Cannot create dummy for inode because inode is not clean"
+                )
+                return
+            os.remove(cache_path)
+            os.open(
+                self.converter.add_dummy_ending(cache_path),
+                os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+            )
+            self.state_store.set_remote(inode)
 
 
 def on_cache_path_or_dummy(func):

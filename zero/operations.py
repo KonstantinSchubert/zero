@@ -3,11 +3,7 @@ import os
 import errno
 from fuse import FuseOSError, Operations
 
-from .cache import (
-    on_cache_path,
-    on_cache_path_or_dummy,
-    on_cache_path_enforce_local,
-)
+from .cache import on_cache_path, on_cache_path_or_dummy
 
 
 class Filesystem(Operations):
@@ -70,28 +66,23 @@ class Filesystem(Operations):
 
     listxattr = None
 
-    @on_cache_path_enforce_local
     def open(self, path, flags):
-        return os.open(path, flags)
+        return self.cache.open(path, flags)
 
     def read(self, path, size, offset, fh):
         print("read", path)
         return self.cache.read(path, size, offset, fh)
 
-    @on_cache_path_enforce_local
+    @on_cache_path_or_dummy
     def readdir(self, path, fh):
         return self.cache.list(path, fh)
 
     def release(self, path, fh):
         print("release", path, fh)
-        # I think the file handle will be the one for the file in the cache?
         return os.close(fh)
 
     def flush(self, path, fh):
         print("flush", path, fh)
-        # I must wait with uploading a written file until the flush and fsync
-        # for it happened, right?
-        # Or am I safe if I just upload *closed* files?
         return os.fsync(fh)
 
     def fsync(self, path, datasync, fh):
@@ -147,10 +138,8 @@ class Filesystem(Operations):
     def symlink(self, path, target):
         return os.symlink(target, path)
 
-    @on_cache_path_enforce_local
     def truncate(self, path, length, fh=None):
-        with open(path, "r+") as f:
-            f.truncate(length)
+        return self.cache.truncate(path, length)
 
     @on_cache_path
     def mkdir(self, path, mode):

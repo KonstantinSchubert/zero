@@ -40,12 +40,19 @@ def fuse_main():
     args = parse_fuse_args()
     config = get_config()
 
+    file_info_store = FileInfoStore(config["sqliteFileLocation"])
+    api = FileAPI(
+        file_info_store=file_info_store,
+        account_id=config["accountId"],
+        application_key=config["applicationKey"],
+        bucket_id=config["bucketId"],
+    )
     converter = PathConverter(args.cache_folder)
     state_store = StateStore(config["sqliteFileLocation"])
     inode_store = InodeStore(config["sqliteFileLocation"])
     rank_store = RankStore(config["sqliteFileLocation"])
     ranker = Ranker(rank_store, inode_store)
-    cache = Cache(converter, state_store, inode_store, ranker)
+    cache = Cache(converter, state_store, inode_store, ranker, api)
     filesystem = Filesystem(cache)
     FUSE(filesystem, args.mountpoint, nothreads=True, foreground=True)
 
@@ -68,7 +75,7 @@ def worker_main():
     inode_store = InodeStore(config["sqliteFileLocation"])
     rank_store = RankStore(config["sqliteFileLocation"])
     ranker = Ranker(rank_store, inode_store)
-    cache = Cache(converter, state_store, inode_store, ranker)
+    cache = Cache(converter, state_store, inode_store, ranker, api)
     worker = Worker(cache, api)
     while True:
         worker.run()

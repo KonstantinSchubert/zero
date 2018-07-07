@@ -82,6 +82,22 @@ class StateStore:
         for entry in entries:
             yield entry[0]
 
+    def is_remote(self, inode):
+        # ugly, might want to refactor this
+        try:
+            self._assert_inode_has_allowed_state(inode, [STATES.REMOTE])
+        except IllegalTransitionException:
+            return False
+        return True
+
+    def is_clean(self, inode):
+        # ugly, might want to refactor this
+        try:
+            self._assert_inode_has_allowed_state(inode, [STATES.CLEAN])
+        except IllegalTransitionException:
+            return False
+        return True
+
     def _transition(self, inode, previous_states, next_state):
         # To make this class thread safe, obtain inode-specific lock for this method.
         if next_state is None:
@@ -101,7 +117,7 @@ class StateStore:
             if None in states:
                 return
             else:
-                raise Exception(
+                raise IllegalTransitionException(
                     f"None of the states {states} match the current state None of the inode"
                 )
         (current_state,) = result

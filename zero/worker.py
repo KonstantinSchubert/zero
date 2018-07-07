@@ -28,6 +28,7 @@ class Worker:
         self.state_store = cache.state_store
         self.inode_store = cache.inode_store
         self.ranker = cache.ranker
+        self.cache = cache
 
     def get_size_of_biggest_file(self):
         """In GB"""
@@ -45,7 +46,7 @@ class Worker:
         return float(du_output) / (1000 * 1000)
 
     def _clean_inode(self, inode):
-        with InodeLock(inode) as lock:
+        with InodeLock(inode, self.cache) as lock:
             path = self.inode_store.get_paths(inode)[0]
             with open(
                 self.converter.to_cache_path(path), "rb"
@@ -72,43 +73,9 @@ class Worker:
 
     def _delete_inode(self, inode):
         # Todo: Obtain inode lock or make operation atomic in sqlite
-        with InodeLock(inode):
+        with InodeLock(inode, self.cache):
             self.api.delete(inode)
             self.state_store.set_deleted(inode)
-
-    def _replace_dummy(self, inode):
-        # Todo: Worry about settings permissions and timestamps
-        # Todo: Worry about concurrency
-        # Todo: should this function go to the Cache class and
-        # instead of a worker I pass api to the cache class and an instance
-        # of cache to the worker?
-        # TODO: Do we need a self.state_store.seet_downlaoding()?
-        path = self.inode_store.get_paths(inode)[0]
-        cache_path = self.converter.to_cache_path(path)
-        with open(cache_path, "w+b") as file:
-            file.write(self.api.download(inode).read())
-        os.remove(self.converter.add_dummy_ending(cache_path))
-        self.state_store.set_downloaded(inode)
-
-    def _create_dummy(self, inode):
-        # Todo: Worry about settings permissions and timestamps
-        # Todo: Worry about concurrency
-        # Todo: should this function go to the Cache class and
-        # instead of a worker I pass api to the cache class and an instance
-        # of cache to the worker?
-        # TODO: Do we need a self.state_store.set_uploading()?
-
-        # INSTEAD OF UPLOADING, MAKE SURE inode IS CLEAN?
-        path = self.inode_store.get_paths(inode)[0]
-        cache_path = self.converter.to_cache_path(path)
-        with open(cache_path, "r+b") as file:
-            self.api.upload(file, inode)
-        os.remove(cache_path)
-        os.open(
-            self.converter.add_dummy_ending(cache_path),
-            os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
-        )
-        self.state_store.set_remote(inode)
 
     def clean(self):
         """Uplaod dirty files to remote"""
@@ -132,10 +99,11 @@ class Worker:
         """Remove unneeded files from cache"""
         # To decide which files to evict,
         # join state table with rank table
-        # and look at files with low rank who are states.CLEAN
+        # and look at files with low rank who are CLEAN
         evictees = self.ranker.get_eviction_candidates(number_of_files)
         print(evictees)
-        TODO: EVICT
+        for inode in evictees:
+            self.cache._create_dummy(inode)
 
     def prime(self, number_of_files):
         """Fill the cache with files from remote
@@ -143,10 +111,10 @@ class Worker:
         """
         # To decide which files to prime with,
         # join state table with rank table and look at files with high
-        # rank who are states.REMOTE
+        # rank who are REMOTE
         primees = self.ranker.get_priming_candidates(number_of_files)
-        print(primees)
-        # TODO: Prime
+        for inode in primees:
+            self.cache._replace_dummy(inode)
 
     def order_cache(self):
         # TODO: Make sure that biggest file < 0.1 * target_disk_usage, else this won't work.

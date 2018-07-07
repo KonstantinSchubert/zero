@@ -12,7 +12,10 @@ class InodeLock:
     # TODO2: Distinguish between read locks and write locks.
     # Multiple read locks at the same time are allowed.
     # But if a write lock exists, there can be no other write lock and no other read lock.
-    def __init__(self, inode, acquisition_max_retries=0, high_priority=False):
+    def __init__(
+        self, inode, cache, acquisition_max_retries=0, high_priority=False
+    ):
+        self.cache = cache
         self.acquisition_max_retries = acquisition_max_retries
         self.inode = inode
         self.high_priority = high_priority
@@ -51,8 +54,32 @@ class InodeLock:
         )
         return cursor.fetchone() is not None
 
+    def _file_is_open(self):
+        if self.cache.state_store.is_remote(self.inode):
+            return False
+        paths = self.cache.inode_store.get_paths(self.inode)
+        # for now simply check ths first one
+        if paths == []:
+            return False
+        path = paths[0]
+        cache_path = self.cache.converter.to_cache_path(path)
+        try:
+            with open(cache_path, "r+"):
+                pass
+        except IOError:
+            return True
+        return False
+
     def _try_locking(self):
         print(f"TRY LOCKING {self.inode}")
+
+        # Check if file is open
+        # Path can not be locked if file is open,
+        # because this means that the OS is writing to it
+        if self._file_is_open():
+            print("Cannot lock inode if file is open")
+            return False
+
         with self.connection:
             # We must disallow any other process from even reading the
             # lock situation before we read and then change the lock situation
