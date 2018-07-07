@@ -32,7 +32,7 @@ class Cache:
         # This could also be solved with some kind of synchronous signal.
         cache_path = self.converter.to_cache_path(fuse_path)
         if os.path.exists(self.converter.add_dummy_ending(cache_path)):
-            self._replace_dummy(fuse_path)
+            self._replace_dummy(self.inode_store.get_inode(fuse_path))
         return cache_path
 
     def _list_nodes_and_dummies(self, dir_path):
@@ -128,18 +128,20 @@ class Cache:
     def is_link(cache_path):
         return os.path.islink(cache_path)
 
+    def replace_dummy(self, inode):
+        with InodeLock(inode):
+            self.replace_dummy(inode)
+
     def _replace_dummy(self, inode):
         # Todo: Worry about settings permissions and timestamps
+        path = self.inode_store.get_paths(inode)[0]
+        cache_path = self.converter.to_cache_path(path)
+        with open(cache_path, "w+b") as file:
+            file.write(self.api.download(inode).read())
+        os.remove(self.converter.add_dummy_ending(cache_path))
+        self.state_store.set_downloaded(inode)
 
-        with InodeLock(inode):
-            path = self.inode_store.get_paths(inode)[0]
-            cache_path = self.converter.to_cache_path(path)
-            with open(cache_path, "w+b") as file:
-                file.write(self.api.download(inode).read())
-            os.remove(self.converter.add_dummy_ending(cache_path))
-            self.state_store.set_downloaded(inode)
-
-    def _create_dummy(self, inode):
+    def create_dummy(self, inode):
         # Todo: Worry about settings permissions and timestamps
         with InodeLock(inode):
             path = self.inode_store.get_paths(inode)[0]

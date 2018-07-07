@@ -102,7 +102,7 @@ class Worker:
         evictees = self.ranker.get_eviction_candidates(number_of_files)
         print(evictees)
         for inode in evictees:
-            self.cache._create_dummy(inode)
+            self.cache.create_dummy(inode)
 
     def prime(self, number_of_files):
         """Fill the cache with files from remote
@@ -113,7 +113,7 @@ class Worker:
         # rank who are REMOTE
         primees = self.ranker.get_priming_candidates(number_of_files)
         for inode in primees:
-            self.cache._replace_dummy(inode)
+            self.cache.replace_dummy(inode)
 
     def order_cache(self):
         # TODO: Make sure that biggest file < 0.1 * target_disk_usage, else this won't work.
