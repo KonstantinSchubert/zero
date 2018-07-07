@@ -56,14 +56,11 @@ class Cache:
     # Instead of wrapping the lock around each read/write operation, should I rather wrap it around the "open" operation?
 
     def read(self, path, size, offset, fh):
-        print("path in cache", path)
         inode = self.inode_store.get_inode(path)
         self.ranker.handle_inode_access(inode)
-        print("inode in cache", inode)
         with InodeLock(inode, acquisition_max_retries=100, high_priority=True):
             # TODO: Need to lock before the "assert is downloaded"
             # wrapper because else worker might evict file before locking
-            print("managed to lock")
             os.lseek(fh, offset, 0)
             return os.read(fh, size)
 

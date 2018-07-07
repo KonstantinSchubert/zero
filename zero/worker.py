@@ -3,11 +3,19 @@ import os
 import time
 from .locking import InodeLockedException, InodeLock
 import subprocess
+from multiprocessing import Process
+
 
 logger = logging.getLogger("spam_application")
 
 
 TARGET_DISK_USAGE = 0.1  # GB
+
+
+def upload(api, file_to_upload, inode):
+    # Maybe I can inline this helper method
+    # exactly where it is used?
+    api.upload(file_to_upload, inode)
 
 
 class Worker:
@@ -42,12 +50,24 @@ class Worker:
             with open(
                 self.converter.to_cache_path(path), "rb"
             ) as file_to_upload:
-                upload_process = self.api.upload(file_to_upload, inode)
-                while upload_process.ongoing:
-                     if lock.abort_requested():
-                        upload_process.abort()
+                print(f"cleaning {path}")
+                # since I don't want to mess with the b2 library code
+                # but I do want to be able to interrupt the upload
+                # the best option seems to be using python multiprocessing
+                # https://docs.python.org/3/library/multiprocessing.html#the-process-class
+                upload_process = Process(
+                    target=upload, args=(self.api, file_to_upload, inode)
+                )
+                upload_process.start()
+                while upload_process.is_alive():
+                    print(f"upload of {path} is alive")
+                    time.sleep(0.1)
+                    if lock.abort_requested():
+                        upload_process.terminate()
+                        print(f"upload of {path} was killed")
                         return
-                    time.sleep(0.01)
+                        # Might want to raise an exception here
+                        # instead wich is caught one mehtod above
             self.state_store.set_clean(inode)
 
     def _delete_inode(self, inode):
