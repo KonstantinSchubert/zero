@@ -1,5 +1,4 @@
 import logging
-import os
 import time
 from .locking import InodeLockedException, InodeLock
 import subprocess
@@ -46,7 +45,7 @@ class Worker:
         return float(du_output) / (1000 * 1000)
 
     def _clean_inode(self, inode):
-        with InodeLock(inode, self.cache) as lock:
+        with InodeLock(inode) as lock:
             path = self.inode_store.get_paths(inode)[0]
             with open(
                 self.converter.to_cache_path(path), "rb"
@@ -73,7 +72,7 @@ class Worker:
 
     def _delete_inode(self, inode):
         # Todo: Obtain inode lock or make operation atomic in sqlite
-        with InodeLock(inode, self.cache):
+        with InodeLock(inode):
             self.api.delete(inode)
             self.state_store.set_deleted(inode)
 

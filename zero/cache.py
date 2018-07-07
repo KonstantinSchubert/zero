@@ -48,7 +48,6 @@ class Cache:
         print(f"CACHE: open {path}")
         with InodeLock(
             self.inode_store.get_inode(path),
-            self,
             high_priority=True,
             acquisition_max_retries=100,
         ):
@@ -58,17 +57,19 @@ class Cache:
 
     def read(self, path, size, offset, fh):
         print(f"CACHE: read {path}")
-        # No need to obtain lock because file is open
-        inode = self.inode_store.get_inode(path)
-        self.ranker.handle_inode_access(inode)
-        os.lseek(fh, offset, 0)
-        return os.read(fh, size)
+        with InodeLock(
+            self.inode_store.get_inode(path),
+            high_priority=True,
+            acquisition_max_retries=100,
+        ):
+            inode = self.inode_store.get_inode(path)
+            self.ranker.handle_inode_access(inode)
+            os.lseek(fh, offset, 0)
+            return os.read(fh, size)
 
     def truncate(self, path, length):
         inode = self.inode_store.get_inode(path)
-        with InodeLock(
-            inode, self, high_priority=True, acquisition_max_retries=100
-        ):
+        with InodeLock(inode, high_priority=True, acquisition_max_retries=100):
             cache_path = self._get_path(path)
             self.state_store.set_dirty(inode)
             self.ranker.handle_inode_access(inode)
@@ -78,11 +79,16 @@ class Cache:
     def write(self, path, data, offset, fh):
         # No need to obtain lock because file is open
         inode = self.inode_store.get_inode(path)
-        self.ranker.handle_inode_access(inode)
-        os.lseek(fh, offset, 0)
-        result = os.write(fh, data)
-        self.state_store.set_dirty(inode)
-        return result
+        with InodeLock(
+            self.inode_store.get_inode(path),
+            high_priority=True,
+            acquisition_max_retries=100,
+        ):
+            self.ranker.handle_inode_access(inode)
+            os.lseek(fh, offset, 0)
+            result = os.write(fh, data)
+            self.state_store.set_dirty(inode)
+            return result
 
     def create(self, path, mode):
         cache_path = self.converter.to_cache_path(path)
@@ -110,7 +116,7 @@ class Cache:
             fuse_path = self.converter.to_fuse_path(cache_path_stripped)
             inode = self.inode_store.get_inode(fuse_path)
             with InodeLock(
-                inode, self, acquisition_max_retries=10, high_priority=True
+                inode, acquisition_max_retries=10, high_priority=True
             ):
                 os.unlink(cache_path)
                 self.inode_store.delete_path(fuse_path)
@@ -125,7 +131,7 @@ class Cache:
     def _replace_dummy(self, inode):
         # Todo: Worry about settings permissions and timestamps
 
-        with InodeLock(inode, self):
+        with InodeLock(inode):
             path = self.inode_store.get_paths(inode)[0]
             cache_path = self.converter.to_cache_path(path)
             with open(cache_path, "w+b") as file:
@@ -135,7 +141,7 @@ class Cache:
 
     def _create_dummy(self, inode):
         # Todo: Worry about settings permissions and timestamps
-        with InodeLock(inode, self):
+        with InodeLock(inode):
             path = self.inode_store.get_paths(inode)[0]
             cache_path = self.converter.to_cache_path(path)
             if not self.state_store.is_clean(inode):
