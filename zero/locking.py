@@ -1,9 +1,18 @@
 import sqlite3
 import time
 
+LOCK_FILE = "lock_db.sqlite3"
+
 
 class InodeLockedException(Exception):
     pass
+
+
+connection = sqlite3.connect(LOCK_FILE, timeout=5)
+with connection:
+    connection.execute(
+        """CREATE TABLE IF NOT EXISTS locks (inode integer primary key, abort_requested integer)"""
+    )
 
 
 class InodeLock:
@@ -16,12 +25,6 @@ class InodeLock:
         self.acquisition_max_retries = acquisition_max_retries
         self.inode = inode
         self.high_priority = high_priority
-        print("inode in init", self.inode)
-        self.connection = sqlite3.connect("lock_db.sqlite3", timeout=5)
-        with self.connection:
-            self.connection.execute(
-                """CREATE TABLE IF NOT EXISTS locks (inode integer primary key, abort_requested integer)"""
-            )
 
     def __enter__(self):
         # Lock database while setting lock
@@ -38,14 +41,13 @@ class InodeLock:
         raise InodeLockedException
 
     def __exit__(self, *args):
-        with self.connection:
-            self.connection.execute("""BEGIN IMMEDIATE""")
-            assert self._is_locked()
+        with connection:
+            connection.execute("""BEGIN IMMEDIATE""")
             self._unlock()
             print(f"unlocked {self.inode}")
 
     def abort_requested(self):
-        cursor = self.connection.execute(
+        cursor = connection.execute(
             """SELECT * FROM locks WHERE inode = ? AND abort_requested = 1 """,
             (self.inode,),
         )
@@ -54,36 +56,39 @@ class InodeLock:
     def _try_locking(self):
         print(f"TRY LOCKING {self.inode}")
 
-        with self.connection:
+        with connection:
             # We must disallow any other process from even reading the
             # lock situation before we read and then change the lock situation
-            self.connection.execute("""BEGIN IMMEDIATE""")
-            if not self._is_locked():
+            connection.execute("""BEGIN IMMEDIATE""")
+            try:
                 self._lock()
-                print(f"locked {self.inode}")
-                return True
-            elif self.high_priority:
-                self._request_abort()
-            return False
-
-    def _is_locked(self):
-        cursor = self.connection.execute(
-            """SELECT * FROM locks WHERE inode = ? """, (self.inode,)
-        )
-        return cursor.fetchone() is not None
+            except InodeLockedException:
+                if self.high_priority:
+                    self._request_abort()
+                return False
+            return True
 
     def _lock(self):
-        self.connection.execute(
-            """INSERT INTO locks (inode) VALUES (?)""", (self.inode,)
-        )
+        try:
+            connection.execute(
+                """INSERT INTO locks (inode) VALUES (?)""", (self.inode,)
+            )
+        except sqlite3.IntegrityError as e:
+            if str(e) == "UNIQUE constraint failed: locks.inode":
+                raise InodeLockedException
+            else:
+                # It was another exception, thus re-raise it
+                raise
+        print(f"locked {self.inode}")
 
     def _unlock(self):
-        self.connection.execute(
+        cursor = connection.execute(
             """DELETE FROM locks WHERE inode = ?""", (self.inode,)
         )
+        assert cursor.rowcount == 1
 
     def _request_abort(self):
-        self.connection.execute(
+        connection.execute(
             """UPDATE locks SET abort_requested=1 WHERE inode = ?""",
             (self.inode,),
         )

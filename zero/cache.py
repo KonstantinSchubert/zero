@@ -130,7 +130,7 @@ class Cache:
 
     def replace_dummy(self, inode):
         with InodeLock(inode):
-            self.replace_dummy(inode)
+            self._replace_dummy(inode)
 
     def _replace_dummy(self, inode):
         # Todo: Worry about settings permissions and timestamps

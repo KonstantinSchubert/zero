@@ -31,8 +31,17 @@ class Worker:
 
     def get_size_of_biggest_file(self):
         """In GB"""
-        # TODO: Implement this. Will need to keep track of this via a table
-        return 0.0025
+        # TODO: Implement this in a reasonably efficient way by caching file sizes
+        path = self.converter.to_cache_path("/")
+        command = (
+            f"find {path} -type f -exec du -a {{}} + | sort -n -r | head -n 1"
+        )
+        du_output = (
+            subprocess.check_output(command, shell=True)
+            .split()[0]
+            .decode("utf-8")
+        )
+        return float(du_output) / (1000 * 1000)
 
     def get_disk_usage(self):
         """Returns cache disk use in GB"""
