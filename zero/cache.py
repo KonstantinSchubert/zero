@@ -166,16 +166,21 @@ class Cache:
             self._replace_dummy(inode)
 
     def _replace_dummy(self, inode):
-        # Todo: Worry about settings permissions and timestamps
+        print("Replacing dummy")
         path = self.inode_store.get_paths(inode)[0]
         cache_path = self.converter.to_cache_path(path)
+        dummy_path = self.converter.add_dummy_ending(cache_path)
+        with open(dummy_path, "r") as dummy_file:
+            stat_dict = json.load(dummy_file)
+        # Rename should preserve permissions, creation time, user and group
+        os.rename(dummy_path, cache_path)
         with open(cache_path, "w+b") as file:
             file.write(self.api.download(inode).read())
-        os.remove(self.converter.add_dummy_ending(cache_path))
+        # Set access time and modification time
+        os.utime(cache_path, (stat_dict["st_atime"], stat_dict["st_mtime"]))
         self.state_store.set_downloaded(inode)
 
     def create_dummy(self, inode):
-        # Todo: Worry about settings permissions and timestamps
         with InodeLock(inode):
             path = self.inode_store.get_paths(inode)[0]
             cache_path = self.converter.to_cache_path(path)
@@ -185,7 +190,9 @@ class Cache:
                 )
                 return
             stat_dict = self._get_stat(cache_path)
-            os.remove(cache_path)
+            dummy_path = self.converter.add_dummy_ending(cache_path)
+            os.rename(cache_path, dummy_path)
+            # Re-name to preserve file permissions, creation time, permissions and user id.
             with open(
                 self.converter.add_dummy_ending(cache_path), "w"
             ) as dummy_file:

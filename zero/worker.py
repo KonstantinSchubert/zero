@@ -8,7 +8,7 @@ from multiprocessing import Process
 logger = logging.getLogger("spam_application")
 
 
-TARGET_DISK_USAGE = 0.01  # GB
+TARGET_DISK_USAGE = 0.015  # GB
 
 
 def upload(api, file_to_upload, inode):
