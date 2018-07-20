@@ -132,12 +132,9 @@ class Cache:
         if cache_path is None:
             raise FuseOSError(errno.ENOENT)
         if self.converter.is_dummy(cache_path):
-            print("Loading stat from:", cache_path)
             with open(cache_path, "r") as file:
                 try:
                     return json.load(file)
-                    This should be working for newly created dummies, but
-                    it does not , I keep getting the exception, why?
                 except Exception as e:
                     # Need this temporariliy until all are migrated onto new scheme
                     print("Could not load stat for: ", cache_path)
