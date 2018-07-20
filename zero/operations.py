@@ -23,25 +23,8 @@ class Filesystem(Operations):
         if not os.access(path, mode):
             raise FuseOSError(errno.EACCES)
 
-    @on_cache_path_or_dummy
     def getattr(self, path, fh=None):
-        if path is None:
-            raise FuseOSError(errno.ENOENT)
-        stat = os.lstat(path)
-        vals = dict(
-            (key, getattr(stat, key))
-            for key in (
-                "st_atime",
-                "st_ctime",
-                "st_gid",
-                "st_mode",
-                "st_mtime",
-                "st_nlink",
-                "st_size",
-                "st_uid",
-            )
-        )
-        return vals
+        return self.cache.getattributes(path)
 
     @on_cache_path_or_dummy
     def chmod(self, path, mode):

@@ -1,4 +1,7 @@
 import os
+import errno
+import json
+from fuse import FuseOSError
 from .locking import InodeLock
 
 
@@ -124,6 +127,39 @@ class Cache:
                 self.ranker.handle_inode_delete(inode)
                 self.state_store.set_todelete(inode)
 
+    def getattributes(self, fuse_path):
+        cache_path = self._get_path_or_dummy(fuse_path)
+        if cache_path is None:
+            raise FuseOSError(errno.ENOENT)
+        if self.converter.is_dummy(cache_path):
+            print("Loading stat from:", cache_path)
+            with open(cache_path, "r") as file:
+                try:
+                    return json.load(file)
+                    This should be working for newly created dummies, but
+                    it does not , I keep getting the exception, why?
+                except Exception as e:
+                    # Need this temporariliy until all are migrated onto new scheme
+                    print("Could not load stat for: ", cache_path)
+        return self._get_stat(cache_path)
+
+    def _get_stat(self, path):
+        stat = os.lstat(path)
+        stat_dict = dict(
+            (key, getattr(stat, key))
+            for key in (
+                "st_atime",
+                "st_ctime",
+                "st_gid",
+                "st_mode",
+                "st_mtime",
+                "st_nlink",
+                "st_size",
+                "st_uid",
+            )
+        )
+        return stat_dict
+
     @staticmethod
     def is_link(cache_path):
         return os.path.islink(cache_path)
@@ -151,11 +187,12 @@ class Cache:
                     "Cannot create dummy for inode because inode is not clean"
                 )
                 return
+            stat_dict = self._get_stat(cache_path)
             os.remove(cache_path)
-            os.open(
-                self.converter.add_dummy_ending(cache_path),
-                os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
-            )
+            with open(
+                self.converter.add_dummy_ending(cache_path), "w"
+            ) as dummy_file:
+                json.dump(stat_dict, dummy_file)
             self.state_store.set_remote(inode)
 
 
