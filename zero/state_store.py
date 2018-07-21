@@ -57,7 +57,12 @@ class StateStore:
         with self.connection:
             self._transition(
                 inode,
-                previous_states=[STATES.CLEAN, STATES.DIRTY, STATES.TODELETE],
+                previous_states=[
+                    STATES.CLEAN,
+                    STATES.DIRTY,
+                    STATES.TODELETE,
+                    STATES.TODELETE,
+                ],
                 next_state=STATES.TODELETE,
             )
 

@@ -1,3 +1,6 @@
+import time
+
+
 class Ranker:
     """Ranks are stored in the rank table which is a table containing
     all paths in the filesystem as primary keys.
@@ -6,12 +9,17 @@ class Ranker:
     def __init__(self, rank_store, inode_store):
         self.rank_store = rank_store
         self.inode_store = inode_store
+        self.access_times = {}
 
     def handle_inode_access(self, inode):
         """Update ranking in reaction to the access event"""
         # Current algorithm is:
         # - Raise importance of accessed path's inode by 3 points
-        self.rank_store.change_rank_on_inode(inode, 3)
+        # - Ignore any repeat access within 10 minutes
+        if not self._was_accessed_recently(inode):
+            print("RECORDING ACCESS")
+            self._record_access_time(inode)
+            self.rank_store.change_rank_on_inode(inode, 3)
         # Potential improvements:
         # - Also raise importance of files in the same directory
         # and in directories above by 2 points
@@ -23,6 +31,13 @@ class Ranker:
         # TODO: PROBLEM IS THAT BIG FILES HAVE MANY READS/WRITES
         # AND EACH READ/WRITE INCREASES THEIR RANK.
         # WE COULD MAYBE NORMALIZE BY FILE SIZE.
+
+    def _record_access_time(self, inode):
+        self.access_times[inode] = time.time()
+
+    def _was_accessed_recently(self, inode):
+        last_access = self.access_times.get(inode)
+        return last_access is not None and (time.time() - last_access < 10 * 60)
 
     def handle_inode_delete(self, inode):
         """Update ranking in reaction to a file being deleted"""

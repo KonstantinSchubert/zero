@@ -121,7 +121,7 @@ class Cache:
             with InodeLock(
                 inode, acquisition_max_retries=10, high_priority=True
             ):
-                os.unlink(cache_path)
+                os.unlink(cache_path)  # May be actual file or dummy
                 self.inode_store.delete_path(fuse_path)
                 # TODO: Only delete inode if no other paths are poinding to it.
                 self.ranker.handle_inode_delete(inode)
