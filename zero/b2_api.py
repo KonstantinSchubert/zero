@@ -7,14 +7,21 @@ from b2.api import B2Api
 from b2.bucket import Bucket
 from b2.account_info.in_memory import InMemoryAccountInfo
 from b2.download_dest import DownloadDestBytes
+from b2.exception import B2ConnectionError
 
 
 class FileAPI:
 
     def __init__(self, file_info_store, account_id, application_key, bucket_id):
-        account_info = InMemoryAccountInfo()
-        self.api = B2Api(account_info)
-        self.api.authorize_account("production", account_id, application_key)
+        try:
+            account_info = InMemoryAccountInfo()
+            self.api = B2Api(account_info)
+            self.api.authorize_account(
+                "production", account_id, application_key
+            )
+        except B2ConnectionError as e:
+            print(e)
+            raise ConnectionError
         self.bucket_api = Bucket(self.api, bucket_id)
         self.file_info_store = file_info_store
 
@@ -40,5 +47,8 @@ class FileAPI:
     def download(self, inode):
         download_dest = DownloadDestBytes()
         file_id = self.file_info_store.get_file_id(inode)
-        self.bucket_api.download_file_by_id(file_id, download_dest)
+        try:
+            self.bucket_api.download_file_by_id(file_id, download_dest)
+        except B2ConnectionError:
+            raise ConnectionError
         return BytesIO(download_dest.get_bytes_written())

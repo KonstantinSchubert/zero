@@ -12,7 +12,7 @@ setup(
     keywords="",
     author="Konstantin Schubert",
     packages=find_packages(),
-    install_requires=["fusepy", "b2", "pyyaml"],
+    install_requires=["fusepy", "b2", "pyyaml", "portalocker"],
     include_package_data=True,
     zip_safe=True,
     entry_points={

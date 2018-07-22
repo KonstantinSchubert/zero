@@ -1,5 +1,6 @@
 import sqlite3
 import time
+import portalocker
 
 LOCK_FILE = "lock_db.sqlite3"
 
@@ -55,40 +56,27 @@ class InodeLock:
 
     def _try_locking(self):
         print(f"TRY LOCKING {self.inode}")
-
-        with connection:
-            # We must disallow any other process from even reading the
-            # lock situation before we read and then change the lock situation
-            connection.execute("""BEGIN IMMEDIATE""")
-            try:
-                self._lock()
-            except InodeLockedException:
-                if self.high_priority:
-                    self._request_abort()
-                return False
-            return True
-
-    def _lock(self):
         try:
-            connection.execute(
-                """INSERT INTO locks (inode) VALUES (?)""", (self.inode,)
+            # portalocker.Lock has its own retry functionality,
+            # But we cannot use it here, because we want to be able
+            # to "request_abort".
+            # It's a bit of a layered approach to build a high-level api
+            # on top of another high-level api such as portalocker.Lock.
+            # But since things are still evolving around here, it will leave it as is.
+            self.lock = portalocker.Lock(
+                filename=str(self.inode), fail_when_locked=True
             )
-        except sqlite3.IntegrityError as e:
-            if str(e) == "UNIQUE constraint failed: locks.inode":
-                raise InodeLockedException
-            else:
-                # It was another exception, thus re-raise it
-                raise
-        print(f"locked {self.inode}")
+            return True
+        except portalocker.exceptions.AlreadyLocked:
+            if self.high_priority:
+                self._request_abort()
+            return False
 
     def _unlock(self):
-        cursor = connection.execute(
-            """DELETE FROM locks WHERE inode = ?""", (self.inode,)
-        )
-        assert cursor.rowcount == 1
+        self.lock.release()
 
     def _request_abort(self):
         connection.execute(
-            """UPDATE locks SET abort_requested=1 WHERE inode = ?""",
+            """INSERT OR REPLACE INTO locks (inode, abort_requested) VALUES (?,1)""",
             (self.inode,),
         )

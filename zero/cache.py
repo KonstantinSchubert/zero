@@ -175,7 +175,10 @@ class Cache:
         # Rename should preserve permissions, creation time, user and group
         os.rename(dummy_path, cache_path)
         with open(cache_path, "w+b") as file:
-            file.write(self.api.download(inode).read())
+            try:
+                file.write(self.api.download(inode).read())
+            except ConnectionError:
+                raise FuseOSError(errno.ENETUNREACH)
         # Set access time and modification time
         os.utime(cache_path, (stat_dict["st_atime"], stat_dict["st_mtime"]))
         self.state_store.set_downloaded(inode)
