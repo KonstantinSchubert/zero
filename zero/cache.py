@@ -182,13 +182,14 @@ class Cache:
 
     def create_dummy(self, inode):
         with InodeLock(inode):
-            path = self.inode_store.get_paths(inode)[0]
-            cache_path = self.converter.to_cache_path(path)
+            # assert that inode is still clean
             if not self.state_store.is_clean(inode):
                 print(
                     "Cannot create dummy for inode because inode is not clean"
                 )
                 return
+            path = self.inode_store.get_paths(inode)[0]
+            cache_path = self.converter.to_cache_path(path)
             stat_dict = self._get_stat(cache_path)
             dummy_path = self.converter.add_dummy_ending(cache_path)
             os.rename(cache_path, dummy_path)
