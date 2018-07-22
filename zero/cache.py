@@ -104,6 +104,8 @@ class Cache:
         return result
 
     def rename(self, old_path, new_path):
+        if self.inode_store.get_inode(new_path):
+            self.unlink(self.converter.to_cache_path(new_path))
         self.inode_store.change_path(old_path, new_path)
         return os.rename(
             self.converter.to_cache_path(old_path),
@@ -111,6 +113,7 @@ class Cache:
         )
 
     def unlink(self, cache_path):
+        print(f"unlink: {cache_path}")
         is_link = self.is_link(cache_path)
         if is_link:
             os.unlink(cache_path)
@@ -121,8 +124,8 @@ class Cache:
             with InodeLock(
                 inode, acquisition_max_retries=10, high_priority=True
             ):
-                os.unlink(cache_path)  # May be actual file or dummy
                 self.inode_store.delete_path(fuse_path)
+                os.unlink(cache_path)  # May be actual file or dummy
                 # TODO: Only delete inode if no other paths are poinding to it.
                 self.ranker.handle_inode_delete(inode)
                 self.state_store.set_todelete(inode)
@@ -185,7 +188,7 @@ class Cache:
 
     def create_dummy(self, inode):
         with InodeLock(inode):
-            # assert that inode is still clean
+            # This can happen if the file was written to in the meantime
             if not self.state_store.is_clean(inode):
                 print(
                     "Cannot create dummy for inode because inode is not clean"

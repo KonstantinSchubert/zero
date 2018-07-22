@@ -8,7 +8,7 @@ from multiprocessing import Process
 logger = logging.getLogger("spam_application")
 
 
-TARGET_DISK_USAGE = 0.02  # GB
+TARGET_DISK_USAGE = 0.05  # GB
 
 
 def upload(api, file_to_upload, inode):
@@ -55,12 +55,11 @@ class Worker:
 
     def _clean_inode(self, inode):
         with InodeLock(inode) as lock:
-            try:
-                path = self.inode_store.get_paths(inode)[0]
-            except IndexError:
-                print(
-                    "Unable to clean {inode}: Not found in DB. Possibly deleted by other process."
-                )
+            if not self.state_store.is_dirty(inode):
+                # This can happen if the file was deleted in the meantime
+                print("Cannot clean inode because inode is not DIRTY")
+                return
+            path = self.inode_store.get_paths(inode)[0]
             with open(
                 self.converter.to_cache_path(path), "rb"
             ) as file_to_upload:
@@ -87,6 +86,10 @@ class Worker:
     def _delete_inode(self, inode):
         # Todo: Obtain inode lock or make operation atomic in sqlite
         with InodeLock(inode):
+            if not self.state_store.is_todelete(inode):
+                # This can happen if the file was re-created in the mantime
+                print("Cannot delete inode because inode is not TODELETE")
+                return
             self.api.delete(inode)
             self.state_store.set_deleted(inode)
 

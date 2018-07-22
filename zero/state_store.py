@@ -61,7 +61,7 @@ class StateStore:
                     STATES.CLEAN,
                     STATES.DIRTY,
                     STATES.TODELETE,
-                    STATES.TODELETE,
+                    STATES.REMOTE,
                 ],
                 next_state=STATES.TODELETE,
             )
@@ -90,7 +90,8 @@ class StateStore:
     def is_remote(self, inode):
         # ugly, might want to refactor this
         try:
-            self._assert_inode_has_allowed_state(inode, [STATES.REMOTE])
+            with self.connection:
+                self._assert_inode_has_allowed_state(inode, [STATES.REMOTE])
         except IllegalTransitionException:
             return False
         return True
@@ -98,7 +99,26 @@ class StateStore:
     def is_clean(self, inode):
         # ugly, might want to refactor this
         try:
-            self._assert_inode_has_allowed_state(inode, [STATES.CLEAN])
+            with self.connection:
+                self._assert_inode_has_allowed_state(inode, [STATES.CLEAN])
+        except IllegalTransitionException:
+            return False
+        return True
+
+    def is_dirty(self, inode):
+        # ugly,need to refactor this
+        try:
+            with self.connection:
+                self._assert_inode_has_allowed_state(inode, [STATES.DIRTY])
+        except IllegalTransitionException:
+            return False
+        return True
+
+    def is_todelete(self, inode):
+        # ugly,need to refactor this
+        try:
+            with self.connection:
+                self._assert_inode_has_allowed_state(inode, [STATES.TODELETE])
         except IllegalTransitionException:
             return False
         return True

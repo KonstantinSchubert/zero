@@ -42,20 +42,22 @@ class InodeLock:
         raise InodeLockedException
 
     def __exit__(self, *args):
-        with connection:
-            connection.execute("""BEGIN IMMEDIATE""")
-            self._unlock()
-            print(f"unlocked {self.inode}")
+        self._unlock()
+        # print(f"unlocked {self.inode}")
 
     def abort_requested(self):
         cursor = connection.execute(
             """SELECT * FROM locks WHERE inode = ? AND abort_requested = 1 """,
             (self.inode,),
         )
-        return cursor.fetchone() is not None
+        was_requested = cursor.fetchone() is not None
+        connection.execute(
+            """DELETE from locks WHERE inode = ?""", (self.inode,)
+        )
+        return was_requested
 
     def _try_locking(self):
-        print(f"TRY LOCKING {self.inode}")
+        # print(f"TRY LOCKING {self.inode}")
         try:
             # portalocker.Lock has its own retry functionality,
             # But we cannot use it here, because we want to be able

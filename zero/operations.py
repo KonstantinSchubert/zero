@@ -143,5 +143,5 @@ class Filesystem(Operations):
         raise NotImplementedError
 
     def write(self, path, data, offset, fh):
-        print("write", path, offset, fh)
+        # print("write", path, offset, fh)
         return self.cache.write(path, data, offset, fh)
