@@ -1,6 +1,5 @@
 import unittest
-import os
-from importlib import reload
+import shutil
 
 
 class LockTest(unittest.TestCase):
@@ -8,8 +7,14 @@ class LockTest(unittest.TestCase):
     def setUp(self):
         from zero import locking
 
-        os.remove(locking.LOCK_FILE)
-        locking = reload(locking)
+        try:
+            shutil.rmtree(locking.LOCKDIR)
+        except FileNotFoundError:
+            pass
+        try:
+            shutil.rmtree(locking.ABORT_REQUEST_DIR)
+        except FileNotFoundError:
+            pass
 
     def test_error_on_unlock_without_lock(self):
         from zero.locking import InodeLock
