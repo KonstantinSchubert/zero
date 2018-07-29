@@ -35,7 +35,7 @@ class Cache:
         # This could also be solved with some kind of synchronous signal.
         cache_path = self.converter.to_cache_path(fuse_path)
         if os.path.exists(self.converter.add_dummy_ending(cache_path)):
-            self.replace_dummy(self.inode_store.get_inode(fuse_path))
+            self._replace_dummy(self.inode_store.get_inode(fuse_path))
         return cache_path
 
     def _list_nodes_and_dummies(self, dir_path):
@@ -166,27 +166,30 @@ class Cache:
 
     def replace_dummy(self, inode):
         with InodeLock(inode):
-            if not self.state_store.is_remote(inode):
-                print(
-                    f"Cannot replace dummy for inode {inode}"
-                    "because inode is not remote."
-                )
-            path = self.inode_store.get_paths(inode)[0]
-            cache_path = self.converter.to_cache_path(path)
-            dummy_path = self.converter.add_dummy_ending(cache_path)
-            with open(dummy_path, "r") as dummy_file:
-                stat_dict = json.load(dummy_file)
-            # Rename should already preserve permissions, creation time, user and group.
-            # So we do not need to set them here.
-            os.rename(dummy_path, cache_path)
-            with open(cache_path, "w+b") as file:
-                try:
-                    file.write(self.api.download(inode).read())
-                except ConnectionError:
-                    raise FuseOSError(errno.ENETUNREACH)
-            # Set access time and modification time
-            os.utime(cache_path, (stat_dict["st_atime"], stat_dict["st_mtime"]))
-            self.state_store.set_downloaded(inode)
+            self._replace_dummy(inode)
+
+    def _replace_dummy(self, inode):
+        if not self.state_store.is_remote(inode):
+            print(
+                f"Cannot replace dummy for inode {inode}"
+                "because inode is not remote."
+            )
+        path = self.inode_store.get_paths(inode)[0]
+        cache_path = self.converter.to_cache_path(path)
+        dummy_path = self.converter.add_dummy_ending(cache_path)
+        with open(dummy_path, "r") as dummy_file:
+            stat_dict = json.load(dummy_file)
+        # Rename should already preserve permissions, creation time, user and group.
+        # So we do not need to set them here.
+        os.rename(dummy_path, cache_path)
+        with open(cache_path, "w+b") as file:
+            try:
+                file.write(self.api.download(inode).read())
+            except ConnectionError:
+                raise FuseOSError(errno.ENETUNREACH)
+        # Set access time and modification time
+        os.utime(cache_path, (stat_dict["st_atime"], stat_dict["st_mtime"]))
+        self.state_store.set_downloaded(inode)
 
     def create_dummy(self, inode):
         with InodeLock(inode):

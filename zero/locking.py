@@ -1,8 +1,10 @@
+import os
 import sqlite3
 import time
 import portalocker
 
 LOCK_FILE = "lock_db.sqlite3"
+LOCKDIR = "/tmp/zero-locks/"
 
 
 class InodeLockedException(Exception):
@@ -17,9 +19,7 @@ with connection:
 
 
 class InodeLock:
-    # TODO: Use a memory-based locking solution to make sure that the
-    # locks disappear when the computer is shut down?
-    # TODO2: Distinguish between read locks and write locks.
+    # TODO: Distinguish between read locks and write locks.
     # Multiple read locks at the same time are allowed.
     # But if a write lock exists, there can be no other write lock and no other read lock.
     def __init__(self, inode, acquisition_max_retries=0, high_priority=False):
@@ -57,7 +57,9 @@ class InodeLock:
         return was_requested
 
     def _try_locking(self):
-        # print(f"TRY LOCKING {self.inode}")
+        if not os.path.exists(LOCKDIR):
+            os.mkdir(LOCKDIR)
+        # print(f"try locking {self.inode}")
         try:
             # portalocker.Lock has its own retry functionality,
             # But we cannot use it here, because we want to be able
@@ -66,15 +68,16 @@ class InodeLock:
             # on top of another high-level api such as portalocker.Lock.
             # But since things are still evolving around here, it will leave it as is.
             self.lock = portalocker.Lock(
-                filename=str(self.inode), fail_when_locked=True
+                filename=LOCKDIR + str(self.inode), fail_when_locked=True
             )
             self.lock.acquire()
-            print("managed to lock {self.inode}")
-            return True
         except portalocker.exceptions.AlreadyLocked:
+            # print("Failed to lock")
             if self.high_priority:
                 self._request_abort()
             return False
+        # print(f"Managed to lock {self.inode}")
+        return True
 
     def _unlock(self):
         self.lock.release()

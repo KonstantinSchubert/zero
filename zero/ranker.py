@@ -13,24 +13,10 @@ class Ranker:
 
     def handle_inode_access(self, inode):
         """Update ranking in reaction to the access event"""
-        # Current algorithm is:
-        # - Raise importance of accessed path's inode by 3 points
-        # - Ignore any repeat access within 10 minutes
         if not self._was_accessed_recently(inode):
             print("RECORDING ACCESS")
             self._record_access_time(inode)
             self.rank_store.record_access(inode, time.time())
-        # Potential improvements:
-        # - Also raise importance of files in the same directory
-        # and in directories above by 2 points
-        # - Also raise importance of files in directories below
-        # the directory of the accessed file by 1 point
-        # We should also consider the form of access, whether the file
-        # was just ls-ted or read or written.
-
-        # TODO: PROBLEM IS THAT BIG FILES HAVE MANY READS/WRITES
-        # AND EACH READ/WRITE INCREASES THEIR RANK.
-        # WE COULD MAYBE NORMALIZE BY FILE SIZE.
 
     def _record_access_time(self, inode):
         self.access_times[inode] = time.time()
