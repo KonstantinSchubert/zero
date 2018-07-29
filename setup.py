@@ -19,7 +19,6 @@ setup(
         "console_scripts": [
             "zero-fuse = zero.main:fuse_main",
             "zero-worker = zero.main:worker_main",
-            "zero-decay = zero.main:decay_rank",
         ]
     },
 )

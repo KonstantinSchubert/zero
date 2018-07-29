@@ -1,4 +1,5 @@
 import sqlite3
+import time
 
 
 class RankStore:
@@ -11,14 +12,14 @@ class RankStore:
                 """CREATE TABLE IF NOT EXISTS ranks (inode integer primary key, rank real)"""
             )
 
-    def change_rank_on_inode(self, inode, rank_delta):
+    def record_access(self, inode, timestamp):
         with self.connection:
-            cursor = self.connection.execute(
-                """SELECT rank FROM ranks WHERE inode = ?""", (inode,)
+            # The rank is simply the timestamp of the last usage:
+            # recent usage <-> high timestamp  <-> high rank
+            self.connection.execute(
+                """INSERT OR REPLACE INTO ranks (inode, rank) VALUES (?, ?)""",
+                (inode, timestamp),
             )
-            result = cursor.fetchone()
-            rank = result and float(result[0]) or 0
-            self._set_rank_on_path(inode, rank + rank_delta)
 
     def remove_inode(self, inode):
         with self.connection:
@@ -49,14 +50,6 @@ class RankStore:
             )
             results = cursor.fetchall()
         return [int(result[0]) for result in results]
-
-    def _set_rank_on_path(self, inode, rank):
-        with self.connection:
-
-            self.connection.execute(
-                """INSERT OR REPLACE INTO ranks (inode, rank) VALUES (?, ?)""",
-                (inode, rank),
-            )
 
     def ranks_are_sorted(self):
         with self.connection:

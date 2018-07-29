@@ -80,11 +80,3 @@ def worker_main():
     while True:
         worker.run()
         time.sleep(10)
-
-
-def decay_rank():
-    config = get_config()
-
-    rank_store = RankStore(config["sqliteFileLocation"])
-    inode_store = InodeStore(config["sqliteFileLocation"])
-    Ranker(rank_store, inode_store).decay_rank()
