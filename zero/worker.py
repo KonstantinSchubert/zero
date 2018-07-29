@@ -78,7 +78,7 @@ class Worker:
                     time.sleep(0.1)
                     if lock.abort_requested():
                         upload_process.terminate()
-                        print(f"upload of {path} was killed")
+                        print(f"upload of {path} was ABORTED")
                         return
                         # Might want to raise an exception here
                         # instead wich is caught one mehtod above

@@ -80,3 +80,14 @@ def worker_main():
     while True:
         worker.run()
         time.sleep(10)
+
+
+def reset_all():
+    import shutil
+    import os
+
+    args = parse_worker_args()
+    config = get_config()
+    shutil.rmtree(args.cache_folder)
+    os.mkdir(args.cache_folder)
+    os.remove(config["sqliteFileLocation"])

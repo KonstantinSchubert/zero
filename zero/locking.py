@@ -1,21 +1,13 @@
 import os
-import sqlite3
 import time
 import portalocker
 
-LOCK_FILE = "lock_db.sqlite3"
 LOCKDIR = "/tmp/zero-locks/"
+ABORT_REQUEST_DIR = "/tmp/zero-abort-requests/"
 
 
 class InodeLockedException(Exception):
     pass
-
-
-connection = sqlite3.connect(LOCK_FILE, timeout=5)
-with connection:
-    connection.execute(
-        """CREATE TABLE IF NOT EXISTS locks (inode integer primary key, abort_requested integer)"""
-    )
 
 
 class InodeLock:
@@ -45,15 +37,15 @@ class InodeLock:
         self._unlock()
         # print(f"unlocked {self.inode}")
 
+    def _get_abort_request_file_name(self):
+        return f"{ABORT_REQUEST_DIR}{self.inode}"
+
     def abort_requested(self):
-        cursor = connection.execute(
-            """SELECT * FROM locks WHERE inode = ? AND abort_requested = 1 """,
-            (self.inode,),
-        )
-        was_requested = cursor.fetchone() is not None
-        connection.execute(
-            """DELETE from locks WHERE inode = ?""", (self.inode,)
-        )
+        was_requested = os.path.exists(self._get_abort_request_file_name())
+        # This should be sufficiently race free as long as we have no more
+        # than one important and one unimportant process
+        if was_requested:
+            os.remove(self._get_abort_request_file_name())
         return was_requested
 
     def _try_locking(self):
@@ -83,7 +75,6 @@ class InodeLock:
         self.lock.release()
 
     def _request_abort(self):
-        connection.execute(
-            """INSERT OR REPLACE INTO locks (inode, abort_requested) VALUES (?,1)""",
-            (self.inode,),
-        )
+        if not os.path.exists(ABORT_REQUEST_DIR):
+            os.mkdir(ABORT_REQUEST_DIR)
+        open(self._get_abort_request_file_name(), "w").close()
