@@ -169,6 +169,7 @@ class Cache:
             self._replace_dummy(inode)
 
     def _replace_dummy(self, inode):
+        print(f"Replacing dummy [{inode}]")
         if not self.state_store.is_remote(inode):
             print(
                 f"Cannot replace dummy for inode {inode}"

@@ -36,11 +36,12 @@ class Worker:
         command = (
             f"find {path} -type f -exec du -a {{}} + | sort -n -r | head -n 1"
         )
-        du_output = (
-            subprocess.check_output(command, shell=True)
-            .split()[0]
-            .decode("utf-8")
-        )
+        response = subprocess.check_output(command, shell=True)
+        try:
+            du_output = response.split()[0].decode("utf-8")
+        except IndexError:
+            # There is no file.
+            return 0
         return float(du_output) / (1000 * 1000)
 
     def get_disk_usage(self):
