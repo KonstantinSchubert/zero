@@ -68,6 +68,8 @@ class InodeLock:
             self.lock = portalocker.Lock(
                 filename=str(self.inode), fail_when_locked=True
             )
+            self.lock.acquire()
+            print("managed to lock {self.inode}")
             return True
         except portalocker.exceptions.AlreadyLocked:
             if self.high_priority:

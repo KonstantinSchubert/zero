@@ -9,7 +9,7 @@ from .utils import remove_recursive_silently
 
 
 TEST_BINARY_DATA = b"some _data"
-TEST_PATH = "home/kon/whatever/yo"
+TEST_INODE = 2
 DB_PATH = "state.db"
 
 
@@ -30,16 +30,16 @@ class B2APITest(unittest.TestCase):
     def _upload_file(self):
         # Tested code expects a file object, but binary stream shoudl have sam eAPI.
         binary_stream = io.BytesIO(TEST_BINARY_DATA)
-        self.fileAPI.upload(binary_stream, TEST_PATH)
+        self.fileAPI.upload(binary_stream, TEST_INODE)
 
     def test_upload_file(self):
         self._upload_file()
 
     def test_delete_file(self):
         self._upload_file()
-        self.fileAPI.delete(TEST_PATH)
+        self.fileAPI.delete(TEST_INODE)
 
     def test_download_file(self):
         self._upload_file()
-        file = self.fileAPI.download(TEST_PATH)
+        file = self.fileAPI.download(TEST_INODE)
         assert file.read() == TEST_BINARY_DATA
