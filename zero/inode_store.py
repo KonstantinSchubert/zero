@@ -45,17 +45,16 @@ class InodeStore:
             # Find all rows where the path starts with old_partial.
             # Update all rows, replaceing old_partial with new_partial in their path
             cursor = self.connection.execute(
-                """SELECT nodepath FROM inodes WHERE nodepath LIKE '?%'""",
-                (old_partial,),
+                f"""SELECT nodepath, inode FROM inodes WHERE nodepath LIKE '{old_partial}%'"""
             )
             matches = cursor.fetchall()
-            for (nodepath,) in matches:
+            for nodepath, inode in matches:
                 new_path = nodepath.replace(old_partial, new_partial)
                 print("current path:", nodepath)
                 print("new path", new_path)
                 self.connection.execute(
-                    """UPDATE inodes SET nodepath=? WHERE id=?""",
-                    (new_path, id),
+                    """UPDATE inodes SET nodepath=? WHERE inode=?""",
+                    (new_path, inode),
                 )
 
     def _create_path(self, path):

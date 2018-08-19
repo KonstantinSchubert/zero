@@ -114,7 +114,13 @@ class Cache:
 
     def rename(self, old_path, new_path):
         # TODO: This function has a bunch of
-        # race conditions if we assume multiple fuse threads
+        # race conditions, especially
+        # if we assume multiple fuse threads
+
+        # We need a way to call PathLock that
+        # creates a new path and also locks it in a race-
+        # free manner.  We need this in multiple parts of the code
+        # also here.
         with PathLock(
             old_path,
             self.inode_store,
