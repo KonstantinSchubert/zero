@@ -2,7 +2,7 @@ import os
 import errno
 import json
 from fuse import FuseOSError
-from .locking import InodeLock
+from .locking import PathLock
 
 
 class Cache:
@@ -49,8 +49,9 @@ class Cache:
 
     def open(self, path, flags):
         print(f"CACHE: open {path}")
-        with InodeLock(
-            self.inode_store.get_inode(path),
+        with PathLock(
+            path,
+            self.inode_store,
             high_priority=True,
             acquisition_max_retries=100,
         ):
@@ -60,8 +61,10 @@ class Cache:
 
     def read(self, path, size, offset, fh):
         print(f"CACHE: read {path}")
-        with InodeLock(
-            self.inode_store.get_inode(path),
+        with PathLock(
+            path,
+            self.inode_store,
+            exclusive_lock_on_leaf=False,
             high_priority=True,
             acquisition_max_retries=100,
         ):
@@ -71,8 +74,13 @@ class Cache:
             return os.read(fh, size)
 
     def truncate(self, path, length):
-        inode = self.inode_store.get_inode(path)
-        with InodeLock(inode, high_priority=True, acquisition_max_retries=100):
+        with PathLock(
+            path,
+            self.inode_store,
+            high_priority=True,
+            acquisition_max_retries=100,
+        ):
+            inode = self.inode_store.get_inode(path)
             cache_path = self._get_path(path)
             self.state_store.set_dirty(inode)
             self.ranker.handle_inode_access(inode)
@@ -80,13 +88,13 @@ class Cache:
                 return f.truncate(length)
 
     def write(self, path, data, offset, fh):
-        # No need to obtain lock because file is open
-        inode = self.inode_store.get_inode(path)
-        with InodeLock(
-            self.inode_store.get_inode(path),
+        with PathLock(
+            path,
+            self.inode_store,
             high_priority=True,
             acquisition_max_retries=100,
         ):
+            inode = self.inode_store.get_inode(path)
             self.ranker.handle_inode_access(inode)
             os.lseek(fh, offset, 0)
             result = os.write(fh, data)
@@ -98,37 +106,79 @@ class Cache:
         result = os.open(
             cache_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode
         )
-        inode = self.inode_store.create_and_get_inode(path)
-        self.state_store.set_dirty(inode)
-        self.ranker.handle_inode_access(inode)
+        self.inode_store.create_partials(path)
+        leaf_inode = self.inode_store.get_inode(path)
+        self.state_store.set_dirty(leaf_inode)
+        self.ranker.handle_inode_access(leaf_inode)
         return result
 
     def rename(self, old_path, new_path):
-        if self.inode_store.get_inode(new_path):
-            self.unlink(self.converter.to_cache_path(new_path))
-        self.inode_store.change_path(old_path, new_path)
-        return os.rename(
-            self.converter.to_cache_path(old_path),
-            self.converter.to_cache_path(new_path),
-        )
+        # TODO: This function has a bunch of
+        # race conditions if we assume multiple fuse threads
+        with PathLock(
+            old_path,
+            self.inode_store,
+            acquisition_max_retries=100,
+            high_priority=True,
+        ):
+            existing_inode_at_new_path = self.inode_store.get_inode(new_path)
+            if existing_inode_at_new_path:
+                if self.state_store.exists(existing_inode_at_new_path):
+                    # inode is a file
+                    with PathLock(
+                        new_path,
+                        self.inode_store,
+                        acquisition_max_retries=100,
+                        high_priority=True,
+                    ):
+                        self._delete_file(new_path)
+                else:
+                    # inode is a folder:
+                    self.rmdir(new_path)
 
-    def unlink(self, cache_path):
-        print(f"unlink: {cache_path}")
+            # Rename the cache files
+            os.rename(
+                self.converter.to_cache_path(old_path),
+                self.converter.to_cache_path(new_path),
+            )
+
+            # Update the inode store
+            self.inode_store.rename_paths(old_path, new_path)
+
+    def rmdir(self, fuse_path, *args, **kwargs):
+        cache_path = self.converter.to_cache_path(fuse_path)
+        print("rmdir", args, kwargs)
+        with PathLock(
+            fuse_path,
+            self.inode_store,
+            high_priority=True,
+            acquisition_max_retries=100,
+        ):
+            self.inode_store.delete_path(fuse_path)
+            return os.rmdir(cache_path, *args, **kwargs)
+
+    def unlink(self, fuse_path):
+        cache_path = self._get_path_or_dummy(fuse_path)
         is_link = self.is_link(cache_path)
         if is_link:
             os.unlink(cache_path)
         else:
-            cache_path_stripped = self.converter.strip_dummy_ending(cache_path)
-            fuse_path = self.converter.to_fuse_path(cache_path_stripped)
-            inode = self.inode_store.get_inode(fuse_path)
-            with InodeLock(
-                inode, acquisition_max_retries=10, high_priority=True
+
+            with PathLock(
+                fuse_path,
+                self.inode_store,
+                acquisition_max_retries=10,
+                high_priority=True,
             ):
-                self.inode_store.delete_path(fuse_path)
-                os.unlink(cache_path)  # May be actual file or dummy
-                # TODO: Only delete inode if no other paths are poinding to it.
-                self.ranker.handle_inode_delete(inode)
-                self.state_store.set_todelete(inode)
+                self._delete_file(fuse_path)
+
+    def _delete_file(self, fuse_path):
+        inode = self.inode_store.get_inode(fuse_path)
+        cache_path = self._get_path_or_dummy(fuse_path)
+        self.inode_store.delete_path(fuse_path)
+        os.unlink(cache_path)  # May be actual file or dummy
+        self.ranker.handle_inode_delete(inode)
+        self.state_store.set_todelete(inode)
 
     def getattributes(self, fuse_path):
         cache_path = self._get_path_or_dummy(fuse_path)
@@ -165,7 +215,8 @@ class Cache:
         return os.path.islink(cache_path)
 
     def replace_dummy(self, inode):
-        with InodeLock(inode):
+        path = self.state_store.get_paths(inode)[0]
+        with PathLock(path, self.inode_store):
             self._replace_dummy(inode)
 
     def _replace_dummy(self, inode):
@@ -193,14 +244,14 @@ class Cache:
         self.state_store.set_downloaded(inode)
 
     def create_dummy(self, inode):
-        with InodeLock(inode):
+        path = self.inode_store.get_paths(inode)[0]
+        with PathLock(path, self.state_store):
             # This can happen if the file was written to in the meantime
             if not self.state_store.is_clean(inode):
                 print(
                     "Cannot create dummy for inode because inode is not clean"
                 )
                 return
-            path = self.inode_store.get_paths(inode)[0]
             cache_path = self.converter.to_cache_path(path)
             stat_dict = self._get_stat(cache_path)
             dummy_path = self.converter.add_dummy_ending(cache_path)

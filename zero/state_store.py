@@ -123,6 +123,14 @@ class StateStore:
             return False
         return True
 
+    def exists(self, inode):
+        with self.connection:
+            cursor = self.connection.execute(
+                """SELECT inode FROM states WHERE inode = ?""", (inode,)
+            )
+        entries = cursor.fetchone()
+        return entries is not None
+
     def _transition(self, inode, previous_states, next_state):
         # To make this class thread safe, obtain inode-specific lock for this method.
         if next_state is None:

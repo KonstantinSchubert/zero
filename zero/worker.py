@@ -1,6 +1,6 @@
 import logging
 import time
-from .locking import InodeLockedException, InodeLock
+from .locking import NodeLockedException, PathLock, NodeLock
 import subprocess
 from multiprocessing import Process
 
@@ -55,12 +55,12 @@ class Worker:
         return float(du_output) / (1000 * 1000)
 
     def _clean_inode(self, inode):
-        with InodeLock(inode) as lock:
-            if not self.state_store.is_dirty(inode):
-                # This can happen if the file was deleted in the meantime
-                print("Cannot clean inode because inode is not DIRTY")
-                return
-            path = self.inode_store.get_paths(inode)[0]
+        if not self.state_store.is_dirty(inode):
+            # This can happen if the file was deleted in the meantime
+            print("Cannot clean inode because inode is not DIRTY")
+            return
+        path = self.inode_store.get_paths(inode)[0]
+        with PathLock(path, self.state_store) as lock:
             with open(
                 self.converter.to_cache_path(path), "rb"
             ) as file_to_upload:
@@ -86,7 +86,7 @@ class Worker:
 
     def _delete_inode(self, inode):
         # Todo: Obtain inode lock or make operation atomic in sqlite
-        with InodeLock(inode):
+        with NodeLock(inode):
             if not self.state_store.is_todelete(inode):
                 # This can happen if the file was re-created in the mantime
                 print("Cannot delete inode because inode is not TODELETE")
@@ -100,7 +100,7 @@ class Worker:
             print(f"Cleaning inode {inode}")
             try:
                 self._clean_inode(inode)
-            except InodeLockedException:
+            except NodeLockedException:
                 print(f"Could not clean: {inode} is locked")
 
     def purge(self):
@@ -109,7 +109,7 @@ class Worker:
             print(f"Deleting inode {inode}")
             try:
                 self._delete_inode(inode)
-            except InodeLockedException:
+            except NodeLockedException:
                 print(f"Could not delete: {inode} is locked")
 
     def evict(self, number_of_files):

@@ -85,7 +85,6 @@ class Filesystem(Operations):
     def rename(self, old, new):
         print(f"called rename {old} -> {new}")
         return self.cache.rename(old, new)
-        raise NotImplementedError
 
     @on_cache_path_or_dummy
     def statfs(self, path):
@@ -131,10 +130,8 @@ class Filesystem(Operations):
 
     @on_cache_path
     def rmdir(self, path, *args, **kwargs):
-        print("rmdir", args, kwargs)
-        return os.rmdir(path, *args, **kwargs)
+        return self.cache.rmdir(path, *args, **kwargs)
 
-    @on_cache_path_or_dummy
     def unlink(self, path):
         print("unlink")
         return self.cache.unlink(path)

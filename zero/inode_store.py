@@ -1,4 +1,5 @@
 import sqlite3
+from .path_utils import _yield_partials
 
 
 class InodeStore:
@@ -15,15 +16,21 @@ class InodeStore:
                 """CREATE TABLE IF NOT EXISTS sequences (name text primary key, value integer)"""
             )
 
-    def create_and_get_inode(self, path):
+    def create_partials(self, path):
         with self.connection:
-            print("creating path", path)
-            self._create_path(path)
-            return self._get_inode(path)
+            for partial in _yield_partials(path):
+                print("creating path", partial)
+                self._create_path(partial)
 
     def get_inode(self, path):
+        assert path[-1] != "/"
+        # All paths end without trailing slash
         with self.connection:
             return self._get_inode(path)
+
+    def get_inodes(self, folder_path):
+        with self.connection:
+            return self._get_inodes(folder_path)
 
     def get_paths(self, inode):
         with self.connection:
@@ -36,30 +43,34 @@ class InodeStore:
         with self.connection:
             self._delete_path(path)
 
-    def change_path(self, old_path, new_path):
+    def rename_paths(self, old_partial, new_partial):
         with self.connection:
-            inode = self._get_inode(old_path)
-            self._delete_path(old_path)
-            self._create_path(new_path, inode)
+            # Find all rows where the path starts with old_partial.
+            # Update all rows, replaceing old_partial with new_partial in their path
+            cursor = self.connection.execute(
+                """SELECT nodepath FROM inodes WHERE nodepath LIKE '?%'""",
+                (old_partial,),
+            )
+            matches = cursor.fetchall()
+            for (nodepath,) in matches:
+                new_path = nodepath.replace(old_partial, new_partial)
+                print("current path:", nodepath)
+                print("new path", new_path)
+                self.connection.execute(
+                    """UPDATE inodes SET nodepath=? WHERE id=?""",
+                    (new_path, id),
+                )
 
-    def _create_path(self, path, inode=None):
-        if inode is None:
-            inode = self._get_inode_sequence()
-            self.connection.execute(
-                # The problem is using max here is that I might re-use
-                # old values if the old max is removed. Better would be
-                # a sequence as it is supported by postgresql
-                """INSERT INTO inodes (nodepath, inode) VALUES (?, ?)
-                """,
-                (path, inode),
-            )
-        else:
-            self.connection.execute(
-                """INSERT INTO inodes (nodepath, inode)
-                VALUES (?, ?)
-                """,
-                (path, inode),
-            )
+    def _create_path(self, path):
+        inode = self._get_inode_sequence()
+        self.connection.execute(
+            # The problem is using max here is that I might re-use
+            # old values if the old max is removed. Better would be
+            # a sequence as it is supported by postgresql
+            """INSERT INTO inodes (nodepath, inode) VALUES (?, ?)
+            """,
+            (path, inode),
+        )
 
     def _delete_path(self, path):
         self.connection.execute(
@@ -72,6 +83,13 @@ class InodeStore:
         )
         result = cursor.fetchone()
         return result and result[0]
+
+    def _get_inodes(self, folder_path):
+        cursor = self.connection.execute(
+            """SELECT inode FROM inodes WHERE nodepath LIKE ?""",
+            (f"folder_path%",),
+        )
+        return cursor.fetchall()
 
     def _get_inode_sequence(self):
         cursor = self.connection.execute(

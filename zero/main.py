@@ -10,7 +10,7 @@ from .state_store import StateStore
 from .inode_store import InodeStore
 from .cache import Cache
 from .worker import Worker
-from .paths import PathConverter
+from .path_converter import PathConverter
 from .b2_api import FileAPI
 from .ranker import Ranker
 from .rank_store import RankStore
