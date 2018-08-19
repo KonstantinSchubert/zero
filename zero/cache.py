@@ -106,7 +106,7 @@ class Cache:
         result = os.open(
             cache_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode
         )
-        self.inode_store.create_partials(path)
+        self.inode_store.create_path(path)
         leaf_inode = self.inode_store.get_inode(path)
         self.state_store.set_dirty(leaf_inode)
         self.ranker.handle_inode_access(leaf_inode)
@@ -144,6 +144,16 @@ class Cache:
 
             # Update the inode store
             self.inode_store.rename_paths(old_path, new_path)
+
+    def mkdir(self, path, mode):
+        print("mkdir", path)
+        # TODO: We need a way to call PathLock that
+        # creates a new path and also locks it in a race-
+        # free manner.  We need this in multiple parts of the code
+        # also here.
+        self.inode_store.create_path(path)
+        cache_path = self.converter.to_cache_path(path)
+        return os.mkdir(cache_path, mode)
 
     def rmdir(self, fuse_path, *args, **kwargs):
         cache_path = self.converter.to_cache_path(fuse_path)

@@ -60,7 +60,7 @@ class Worker:
             print("Cannot clean inode because inode is not DIRTY")
             return
         path = self.inode_store.get_paths(inode)[0]
-        with PathLock(path, self.state_store) as lock:
+        with PathLock(path, self.inode_store) as lock:
             with open(
                 self.converter.to_cache_path(path), "rb"
             ) as file_to_upload:
@@ -85,8 +85,7 @@ class Worker:
             self.state_store.set_clean(inode)
 
     def _delete_inode(self, inode):
-        # Todo: Obtain inode lock or make operation atomic in sqlite
-        with NodeLock(inode):
+        with NodeLock(inode, exclusive=True):
             if not self.state_store.is_todelete(inode):
                 # This can happen if the file was re-created in the mantime
                 print("Cannot delete inode because inode is not TODELETE")

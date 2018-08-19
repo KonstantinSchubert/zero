@@ -123,12 +123,10 @@ class Filesystem(Operations):
     def truncate(self, path, length, fh=None):
         return self.cache.truncate(path, length)
 
-    @on_cache_path
     def mkdir(self, path, mode):
         print("mkdir", path, mode)
-        return os.mkdir(path, mode)
+        return self.cache.mkdir(path, mode)
 
-    @on_cache_path
     def rmdir(self, path, *args, **kwargs):
         return self.cache.rmdir(path, *args, **kwargs)
 

@@ -55,10 +55,17 @@ class PathLock:
     def __enter__(self):
         for lock in self.locks:
             lock.__enter__()
+        return self
 
     def __exit__(self, *args):
         for lock in self.locks:
             lock.__exit__()
+
+    def abort_requested(self):
+        for lock in self.locks:
+            if lock.abort_requested():
+                return True
+        return False
 
 
 class NodeLock:
