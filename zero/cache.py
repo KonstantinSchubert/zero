@@ -186,11 +186,7 @@ class Cache:
             raise FuseOSError(errno.ENOENT)
         if self.converter.is_dummy(cache_path):
             with open(cache_path, "r") as file:
-                try:
-                    return json.load(file)
-                except Exception as e:
-                    # Need this temporariliy until all are migrated onto new scheme
-                    print("Could not load stat for: ", cache_path)
+                return json.load(file)
         return self._get_stat(cache_path)
 
     def _get_stat(self, path):

@@ -1,7 +1,7 @@
 import os
 import time
 import portalocker
-from .path_utils import _yield_partials
+from .path_utils import yield_partials
 
 LOCKDIR = "/tmp/zero-locks/"
 ABORT_REQUEST_DIR = "/tmp/zero-abort-requests/"
@@ -29,7 +29,7 @@ class PathLock:
         of the path except the last one and an exclusive
         lock on the last node, the "leaf" of the path.
         """
-        partials = list(_yield_partials(path))
+        partials = list(yield_partials(path))
         self.locks = []
         # Locks for non-leaf-partials
         for path in partials[:-1]:

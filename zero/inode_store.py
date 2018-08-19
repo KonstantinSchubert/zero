@@ -1,5 +1,5 @@
 import sqlite3
-from .path_utils import _yield_partials
+from .path_utils import yield_partials
 
 
 class InodeStore:
@@ -18,7 +18,7 @@ class InodeStore:
 
     def create_partials(self, path):
         with self.connection:
-            for partial in _yield_partials(path):
+            for partial in yield_partials(path):
                 print("creating path", partial)
                 self._create_path(partial)
 

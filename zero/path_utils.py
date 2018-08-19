@@ -1,5 +1,5 @@
-def _yield_partials(path):
-    partial_path = "/"
+def yield_partials(path):
+    partial_path = ""
     for node in path.split("/"):
         if node == "":
             continue

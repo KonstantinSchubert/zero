@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 from zero.worker import Worker
 from zero.cache import Cache
-from zero.paths import PathConverter
+from zero.path_converter import PathConverter
 from zero.state_store import StateStore
 from zero.inode_store import InodeStore
 from zero.rank_store import RankStore
