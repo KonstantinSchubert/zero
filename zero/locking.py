@@ -70,11 +70,6 @@ class PathLock:
 
 class NodeLock:
 
-    GLOBAL = "GLOBAL_LOCK"
-
-    # TODO: Distinguish between read locks and write locks.
-    # Multiple read locks at the same time are allowed.
-    # But if a write lock exists, there can be no other write lock and no other read lock.
     def __init__(
         self, inode, exclusive, acquisition_max_retries=0, high_priority=False
     ):
@@ -105,12 +100,7 @@ class NodeLock:
         return f"{ABORT_REQUEST_DIR}{self.inode}"
 
     def abort_requested(self):
-        was_requested = os.path.exists(self._get_abort_request_file_name())
-        # This should be sufficiently race free as long as we have no more
-        # than one important and one unimportant process
-        if was_requested:
-            os.remove(self._get_abort_request_file_name())
-        return was_requested
+        return os.path.exists(self._get_abort_request_file_name())
 
     def _try_locking(self):
         if not os.path.exists(LOCKDIR):
@@ -124,7 +114,9 @@ class NodeLock:
             # on top of another high-level api such as portalocker.Lock.
             # But since things are still evolving around here, it will leave it as is.
             self.lock = portalocker.Lock(
-                filename=LOCKDIR + str(self.inode), fail_when_locked=True
+                filename=LOCKDIR + str(self.inode),
+                fail_when_locked=True,
+                flags=self._get_flags(),
             )
             self.lock.acquire()
         except portalocker.exceptions.AlreadyLocked:
@@ -133,10 +125,21 @@ class NodeLock:
                 self._request_abort()
             return False
         # print(f"Managed to lock {self.inode}")
+        self._remove_abort_request()
         return True
+
+    def _get_flags(self):
+        if self.exclusive:
+            return portalocker.LOCK_NB | portalocker.LOCK_EX
+        else:
+            return portalocker.LOCK_NB | portalocker.LOCK_SH
 
     def _unlock(self):
         self.lock.release()
+
+    def _remove_abort_request(self):
+        if self.abort_requested():
+            os.remove(self._get_abort_request_file_name())
 
     def _request_abort(self):
         if not os.path.exists(ABORT_REQUEST_DIR):

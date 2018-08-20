@@ -81,7 +81,7 @@ class Worker:
                         print(f"upload of {path} was ABORTED")
                         return
                         # Might want to raise an exception here
-                        # instead wich is caught one mehtod above
+                        # instead wich is caught one method above
             self.state_store.set_clean(inode)
 
     def _delete_inode(self, inode):
