@@ -17,16 +17,31 @@ class LockTest(unittest.TestCase):
             pass
 
     def test_error_on_unlock_without_lock(self):
-        from zero.locking import InodeLock
+        from zero.locking import NodeLock
 
         with self.assertRaises(Exception):
-            lock = InodeLock(1)
+            lock = NodeLock(1)
             lock._unlock()
 
-    def test_cannot_lock_locked_inode(self):
-        from zero.locking import InodeLock, InodeLockedException
+    def test_cannot_lock_with_exclusive_lock_if_shared_lock_exists(self):
+        from zero.locking import NodeLock, NodeLockedException
 
-        with InodeLock(1):
-            lock2 = InodeLock(1)
-            with self.assertRaises(InodeLockedException):
+        with NodeLock(1, exclusive=False):
+            lock2 = NodeLock(1, exclusive=True)
+            with self.assertRaises(NodeLockedException):
                 lock2.__enter__()
+
+    def test_cannot_lock_with_shared_lock_if_shared_exclusive_lock_exists(self):
+        from zero.locking import NodeLock, NodeLockedException
+
+        with NodeLock(1, exclusive=True):
+            lock2 = NodeLock(1, exclusive=False)
+            with self.assertRaises(NodeLockedException):
+                lock2.__enter__()
+
+    def test_can_lock_with_shard_lock_if_shared_lock_exists(self):
+        from zero.locking import NodeLock
+
+        with NodeLock(1, exclusive=False):
+            lock2 = NodeLock(1, exclusive=False)
+            lock2.__enter__()

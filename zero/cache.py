@@ -118,8 +118,8 @@ class Cache:
         # if we assume multiple fuse threads
 
         # We need a way to call PathLock that
-        # creates a new path and also locks it in a race-
-        # free manner.  We need this in multiple parts of the code
+        # creates a new path in the inode_store and also locks it in a race-
+        # free manner.  We need this in multiple parts of the code,
         # also here.
         with PathLock(
             old_path,
@@ -227,7 +227,7 @@ class Cache:
         return os.path.islink(cache_path)
 
     def replace_dummy(self, inode):
-        path = self.state_store.get_paths(inode)[0]
+        path = self.inode_store.get_paths(inode)[0]
         with PathLock(path, self.inode_store):
             self._replace_dummy(inode)
 
@@ -257,7 +257,7 @@ class Cache:
 
     def create_dummy(self, inode):
         path = self.inode_store.get_paths(inode)[0]
-        with PathLock(path, self.state_store):
+        with PathLock(path, self.inode_store):
             # This can happen if the file was written to in the meantime
             if not self.state_store.is_clean(inode):
                 print(
