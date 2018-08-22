@@ -203,7 +203,8 @@ class Cache:
         if self.converter.is_dummy(cache_path):
             with open(cache_path, "r") as file:
                 return json.load(file)
-        return self._get_stat(cache_path)
+        else:
+            return self._get_stat(cache_path)
 
     def _get_stat(self, path):
         stat = os.lstat(path)

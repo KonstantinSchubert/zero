@@ -18,6 +18,8 @@ class Filesystem(Operations):
 
     @on_cache_path_or_dummy
     def access(self, path, mode):
+        print(f"access on {path} with {mode}")
+        # Check user permissions for a file
         if path is None:
             raise FuseOSError(errno.EACCES)
         if not os.access(path, mode):
@@ -104,6 +106,7 @@ class Filesystem(Operations):
                 "f_namemax",
             )
         }
+        TODO
 
         # Todo: Remove some keys from above's list and set them here
         # Deal with the case that that path is a dummy and the case

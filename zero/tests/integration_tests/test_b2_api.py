@@ -5,7 +5,7 @@ from zero.b2_api import FileAPI
 from zero.b2_file_info_store import FileInfoStore
 from zero.main import get_config
 
-from .utils import remove_recursive_silently
+from ..utils import remove_recursive_silently
 
 
 TEST_BINARY_DATA = b"some _data"
