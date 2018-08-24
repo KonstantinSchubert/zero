@@ -10,6 +10,7 @@ from zero.inode_store import InodeStore
 from zero.rank_store import RankStore
 from zero.ranker import Ranker
 
+
 CACHE_DIR = "test_cache_dir/"
 DB_PATH = "state.db"
 
@@ -32,6 +33,7 @@ class TestingContext:
             self.ranker,
             self.api,
         )
+        self.worker = Worker(self.cache, api)
 
     def create_file(self, path, content):
         self.cache.create(path, 33204)

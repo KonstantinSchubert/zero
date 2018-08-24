@@ -1,10 +1,8 @@
-import unittest
 import io
-
+from unittest import TestCase
 from zero.b2_api import FileAPI
 from zero.b2_file_info_store import FileInfoStore
 from zero.main import get_config
-
 from ..utils import remove_recursive_silently
 
 
@@ -13,7 +11,7 @@ TEST_INODE = 2
 DB_PATH = "state.db"
 
 
-class B2APITest(unittest.TestCase):
+class B2APITest(TestCase):
 
     def setUp(self):
         # Todo mock this and pass fake data here (?)
