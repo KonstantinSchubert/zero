@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 from zero.operations import Filesystem
 
-from .configure import TestingContext
+from .configure import IntegrationTestingContext
 
 PATH = "yo"
 FILE_CONTENT = b"Some file content"
@@ -20,7 +20,7 @@ class AccessTest(OperationTest):
 
     def setUp(self):
         self.api = MagicMock()
-        self.context = TestingContext(api=self.api)
+        self.context = IntegrationTestingContext(api=self.api)
         self.filesystem = Filesystem(self.context.cache)
 
     def test_access_local_file(self):

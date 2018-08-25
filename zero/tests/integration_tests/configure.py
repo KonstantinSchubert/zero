@@ -15,7 +15,7 @@ CACHE_DIR = "test_cache_dir/"
 DB_PATH = "state.db"
 
 
-class TestingContext:
+class IntegrationTestingContext:
 
     def __init__(self, api):
         self._reset()

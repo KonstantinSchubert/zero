@@ -1,7 +1,7 @@
 __pycache__
 *egg-info
 b2_real_credentials.py
-state.db
+*.db
 .pytest_cache
 test_cache_dir
 *sqlite3
