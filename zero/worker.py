@@ -1,8 +1,9 @@
 import logging
 import time
-from .locking import NodeLockedException, PathLock, NodeLock
 import subprocess
 from multiprocessing import Process
+from .locking import NodeLockedException, PathLock, NodeLock
+from .file_utils import open_without_changing_times
 
 
 logger = logging.getLogger("spam_application")
@@ -61,7 +62,7 @@ class Worker:
             return
         path = self.inode_store.get_paths(inode)[0]
         with PathLock(path, self.inode_store) as lock:
-            with open(
+            with open_without_changing_times(
                 self.converter.to_cache_path(path), "rb"
             ) as file_to_upload:
                 print(f"cleaning {path}")

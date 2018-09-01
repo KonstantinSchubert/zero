@@ -3,6 +3,7 @@ import errno
 import json
 from fuse import FuseOSError
 from .locking import PathLock
+from .file_utils import get_stat_dictionary, open_without_changing_times
 
 
 class Cache:
@@ -204,24 +205,7 @@ class Cache:
             with open(cache_path, "r") as file:
                 return json.load(file)
         else:
-            return self._get_stat(cache_path)
-
-    def _get_stat(self, path):
-        stat = os.lstat(path)
-        stat_dict = dict(
-            (key, getattr(stat, key))
-            for key in (
-                "st_atime",
-                "st_ctime",
-                "st_gid",
-                "st_mode",
-                "st_mtime",
-                "st_nlink",
-                "st_size",
-                "st_uid",
-            )
-        )
-        return stat_dict
+            return get_stat_dictionary(cache_path)
 
     @staticmethod
     def is_link(cache_path):
@@ -266,11 +250,11 @@ class Cache:
                 )
                 return
             cache_path = self.converter.to_cache_path(path)
-            stat_dict = self._get_stat(cache_path)
+            stat_dict = get_stat_dictionary(cache_path)
             dummy_path = self.converter.add_dummy_ending(cache_path)
             os.rename(cache_path, dummy_path)
             # Re-name to preserve file permissions, creation time, permissions and user id.
-            with open(
+            with open_without_changing_times(
                 self.converter.add_dummy_ending(cache_path), "w"
             ) as dummy_file:
                 json.dump(stat_dict, dummy_file)
