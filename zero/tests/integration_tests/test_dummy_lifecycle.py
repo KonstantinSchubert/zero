@@ -6,6 +6,7 @@ from zero.main import get_config
 from zero.operations import Filesystem
 from .configure import IntegrationTestingContext
 from ..utils import remove_recursive_silently
+from ..asserts import assert_stat_equal, assert_stat_unequal
 
 
 PATH = "yo"
@@ -41,15 +42,15 @@ class DummyLifeCycleTest(TestCase):
         # File should now have different permissions
         print(self.filesystem.getattr(path))
         stat_after_chmod = self.filesystem.getattr(path)
-        self.assert_stat_unequal(stat_after_chmod, stat_before_chmod)
+        assert_stat_unequal(stat_after_chmod, stat_before_chmod)
         # make file remote
         inode = self.context.inode_store.get_inode(path)
         self.context.worker._clean_inode(inode)
         self.context.cache.create_dummy(inode)
-        self.assert_stat_equal(stat_after_chmod, self.filesystem.getattr(path))
+        assert_stat_equal(stat_after_chmod, self.filesystem.getattr(path))
         # make file local
         self.context.cache.replace_dummy(inode)
-        self.assert_stat_equal(stat_after_chmod, self.filesystem.getattr(path))
+        assert_stat_equal(stat_after_chmod, self.filesystem.getattr(path))
 
     def assertDictAlmostEqual(self, first, second):
         for key in first.keys():
@@ -57,25 +58,3 @@ class DummyLifeCycleTest(TestCase):
 
     def create_local_file(self):
         return self.context.create_file(PATH, FILE_CONTENT)
-
-    def assert_stat_equal(self, first, second):
-        # We are not managing the ctime at the moment
-        # because it can only be written by the system
-        # and we would have to permanently obtain it from a different
-        # storage place, such a meta data file
-        first = first.copy()
-        second = second.copy()
-        first.pop("st_ctime")
-        second.pop("st_ctime")
-        assert first == second
-
-    def assert_stat_unequal(self, first, second):
-        # We are not managing the ctime at the moment
-        # because it can only be written by the system
-        # and we would have to permanently obtain it from a different
-        # storage place, such a meta data file
-        first = first.copy()
-        second = second.copy()
-        first.pop("st_ctime")
-        second.pop("st_ctime")
-        assert first != second
