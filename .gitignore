@@ -4,4 +4,3 @@ b2_real_credentials.py
 *.db
 .pytest_cache
 test_cache_dir
-*sqlite3
