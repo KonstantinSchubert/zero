@@ -52,9 +52,11 @@ class Filesystem(Operations):
     listxattr = None
 
     def open(self, path, flags):
+        print("opening")
         return self.cache.open(path, flags)
 
     def read(self, path, size, offset, fh):
+        print("read-fh:", fh)
         print("read", path)
         return self.cache.read(path, size, offset, fh)
 
@@ -82,7 +84,9 @@ class Filesystem(Operations):
 
     def create(self, path, mode):
         print("create", path, mode)
-        return self.cache.create(path, mode)
+        fh = self.cache.create(path, mode)
+        print("create-fh", fh)
+        return fh
 
     def rename(self, old, new):
         print(f"called rename {old} -> {new}")
