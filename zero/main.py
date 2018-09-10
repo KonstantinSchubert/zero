@@ -41,6 +41,9 @@ def fuse_main():
     FUSE(filesystem, args.mountpoint, nothreads=True, foreground=True)
 
 
+TARGET_DISK_USAGE = 0.01  # GB
+
+
 def worker_main():
 
     args = parse_worker_args()
@@ -60,7 +63,7 @@ def worker_main():
     rank_store = RankStore(config["sqliteFileLocation"])
     ranker = Ranker(rank_store, inode_store)
     cache = Cache(converter, state_store, inode_store, ranker, api)
-    worker = Worker(cache, api)
+    worker = Worker(cache, api, target_disk_usage=config["targetDiskUsage"])
     while True:
         worker.run()
         time.sleep(10)

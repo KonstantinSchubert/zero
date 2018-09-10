@@ -9,9 +9,6 @@ from .file_utils import open_without_changing_times
 logger = logging.getLogger("spam_application")
 
 
-TARGET_DISK_USAGE = 0.01  # GB
-
-
 def upload(api, file_to_upload, inode):
     # Maybe I can inline this helper method
     # exactly where it is used?
@@ -20,7 +17,7 @@ def upload(api, file_to_upload, inode):
 
 class Worker:
 
-    def __init__(self, cache, api):
+    def __init__(self, cache, api, target_disk_usage):
         self.api = api
         # Todo: Write methods in the cache class which wrap the
         # objects from the following two objects that I am using here
@@ -136,19 +133,19 @@ class Worker:
     def order_cache(self):
         # TODO: Make sure that biggest file < 0.1 * target_disk_usage, else this won't work.
         if (
-            abs(self.get_disk_usage() - TARGET_DISK_USAGE)
+            abs(self.get_disk_usage() - self.target_disk_usage)
             < 1.2 * self.get_size_of_biggest_file()
             and self.ranker.is_sufficiently_sorted()
         ):
             print(
                 f"""Cache has the right size and is filled with the right files.
                 Current disk usage {self.get_disk_usage()}
-                Target disk usage {TARGET_DISK_USAGE}
+                Target disk usage {self.target_disk_usage}
                 Tolerance {1.2 * self.get_size_of_biggest_file()}
                 """
             )
             return
-        elif self.get_disk_usage() > TARGET_DISK_USAGE:
+        elif self.get_disk_usage() > self.target_disk_usage:
             # If I want to evict and prime with a higher number
             # of files then I need to make sure I don't overshoot,
             # so I have to get slower as I approach the boundary
