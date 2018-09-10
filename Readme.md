@@ -5,7 +5,7 @@ Fuse filesystem backed by backblaze cloud storage and transparent local persiste
 Ideally, it feels like an infinite local file system because it keeps those files local that are used while moving those files to the remote storage that haven't been accessed in a long time.
 
 ## State of Development
-**This is Work in Progress**
+**This is WORK IN PROGRESS**
 
 There are a few *known issues and race conditions*. For example, the ctime on the files may be newer than the correct value. Also, writes and reads are *slow*.
 *Do not use in production.*
