@@ -3,4 +3,4 @@ python:
   - "3.6"
 script:
   - python setup.py develop
-  - pytest --ignore=tests/test_b2_api.py
+  - pytest --ignore=tests/integration_tests/test_b2_api.py

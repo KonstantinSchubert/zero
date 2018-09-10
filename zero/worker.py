@@ -19,6 +19,7 @@ class Worker:
 
     def __init__(self, cache, api, target_disk_usage):
         self.api = api
+        self.target_disk_usage = target_disk_usage
         # Todo: Write methods in the cache class which wrap the
         # objects from the following two objects that I am using here
         self.converter = cache.converter
