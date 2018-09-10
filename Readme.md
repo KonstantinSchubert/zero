@@ -27,6 +27,23 @@ and save in `~/.config/zero/`
 
 Here, `accountId`, `applicationKey` and `bucketId` are the corresponding backblaze settings and `sqliteFileLocation` is simply the path to a place where the sqlite databases containing the state of the virtual file system can be stored.
 
+The size of the disk cache is currently hard-coded in the `TARGET_DISK_USAGE` variable. (I said this is work in progress :D) You can find it in the code and change it to whatever number you like.
+
+Install with `python setup.py develop`
+
+## Usage
+
+Run 
+
+    zero-fuse <mountpoint> <cache-location>
+    
+to mount the file system.
+You will also need to run
+
+    zero-worker <cache-location>
+    
+to start the worker process that moves files between disk and cloud.
+
 
 ## Testing
 
