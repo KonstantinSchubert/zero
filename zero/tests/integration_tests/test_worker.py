@@ -13,6 +13,7 @@ CACHE_DIR = "test_cache_dir/"
 DB_PATH = "state.db"
 PATH = "yo"
 FILE_CONTENT = b"Some file content"
+CACHE_SIZE = 0.01  # GB
 
 
 class WorkerTest(unittest.TestCase):
@@ -21,7 +22,7 @@ class WorkerTest(unittest.TestCase):
         # Todo mock this and pass fake data here (?)
         self.api = MagicMock()
         self.context = IntegrationTestingContext(self.api)
-        self.worker = Worker(self.context.cache, self.api)
+        self.worker = Worker(self.context.cache, self.api, CACHE_SIZE)
         file_path = self.context.create_file(PATH, FILE_CONTENT)
         self.inode = self.context.inode_store.get_inode(file_path)
         self.converter = self.context.converter

@@ -13,6 +13,7 @@ from zero.ranker import Ranker
 
 CACHE_DIR = "test_cache_dir/"
 DB_PATH = "state.db"
+CACHE_SIZE = 0.01  # GB
 
 
 class IntegrationTestingContext:
@@ -33,7 +34,7 @@ class IntegrationTestingContext:
             self.ranker,
             self.api,
         )
-        self.worker = Worker(self.cache, api)
+        self.worker = Worker(self.cache, api, CACHE_SIZE)
 
     def create_file(self, path, content):
         self.cache.create(path, 33204)
