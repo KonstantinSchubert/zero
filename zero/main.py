@@ -1,8 +1,7 @@
-import argparse
+
 import time
-import yaml
+
 from fuse import FUSE
-from os.path import expanduser
 
 
 from .operations import Filesystem
@@ -17,22 +16,7 @@ from .rank_store import RankStore
 from .b2_file_info_store import FileInfoStore
 
 
-def get_config():
-    with open(expanduser("~/.config/zero/config.yml"), "r") as config:
-        return yaml.load(config)
-
-
-def parse_fuse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("mountpoint", type=str, help="Mountpoint")
-    parser.add_argument("cache_folder", type=str, help="Cache folder")
-    return parser.parse_args()
-
-
-def parse_worker_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("cache_folder", type=str, help="Cache folder")
-    return parser.parse_args()
+from .config_utils import get_config, parse_fuse_args, parse_worker_args
 
 
 def fuse_main():

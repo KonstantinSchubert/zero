@@ -2,7 +2,7 @@ from unittest import TestCase
 import stat
 from zero.b2_api import FileAPI
 from zero.b2_file_info_store import FileInfoStore
-from zero.main import get_config
+from zero.config_utils import get_config
 from zero.operations import Filesystem
 from .configure import IntegrationTestingContext
 from ..utils import remove_recursive_silently
