@@ -15,8 +15,8 @@ class STATES:
 class StateStore:
     """ This class is NOT thread safe"""
 
-    def __init__(self, db_inode):
-        self.connection = sqlite3.connect(db_inode, timeout=5)
+    def __init__(self, db_name):
+        self.connection = sqlite3.connect(db_name, timeout=5)
         with self.connection:
             self.connection.execute(
                 """CREATE TABLE IF NOT EXISTS states (inode integer primary key, state text)"""

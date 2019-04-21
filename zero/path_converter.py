@@ -12,10 +12,11 @@ class PathConverter:
         to a path in the fuse file system without checking if
         that node exists.
         """
-        return self.cache_folder + fuse_path  # this is probably all wrong.
-        # os.path.realpath or os.path.abspath might help
+        return self.cache_folder + fuse_path
 
     def to_fuse_path(self, cache_path):
+        """ Returns the path in the fuse file system given the path in the
+        cache system"""
         return cache_path.replace(self.cache_folder, "")
 
     def is_dummy(self, cache_path):

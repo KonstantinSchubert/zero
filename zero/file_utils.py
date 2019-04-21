@@ -2,7 +2,8 @@ import os
 
 
 class open_without_changing_times:
-
+    this won't be needed any more if I record the times in
+    the metadata manually
     def __init__(self, path, mode):
         self.path = path
         self.mode = mode
