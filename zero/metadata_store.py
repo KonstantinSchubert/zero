@@ -8,6 +8,14 @@ class TIMES:
     CTIME = "ctime"
 
 
+# TODO: Add other metadata? Or is some of it stored via the dummy?:
+
+#             "st_gid",
+#             "st_mode",
+#             "st_nlink",
+#             "st_size",
+#             "st_uid",
+
 class MetaData:
     """Stores meta data about the file such as file access times."""
 
@@ -20,19 +28,28 @@ class MetaData:
                 """CREATE TABLE IF NOT EXISTS metadata (inode integer primary key, atime timestamp, mtime timestamp, ctime timestamp)"""
             )
 
+    # TODO: These hooks need to get called in more places.
+    def record_content_modification(self, inode):
+        self._record_change(inode)
+        self._record_modification(inode)
+        self._record_access(inode)
+
     def record_access(self, inode):
+        self._record_access(inode)
+
+    def _record_access(self, inode):
         """Sets the atime"""
         with self.connection:
             self._initialize_entry_if_not_exists()
             self._set_column_to_now(TIMES.ATIME)
 
-    def record_modification(self, inode):
+    def _record_modification(self, inode):
         """Sets the mtime"""
         with self.connection:
             self._initialize_entry_if_not_exists()
             self._set_column_to_now(TIMES.MTIME)
 
-    def record_change(self, inode):
+    def _record_change(self, inode):
         """Sets the ctime"""
         with self.connection:
             self._initialize_entry_if_not_exists()

@@ -92,32 +92,8 @@ class Filesystem(Operations):
         print(f"called rename {old} -> {new}")
         return self.cache.rename(old, new)
 
-    @on_cache_path_or_dummy
     def statfs(self, path):
-        cache_stat_info = os.statvfs(path)
-        stat_info = {
-            key: getattr(cache_stat_info, key)
-            for key in (
-                "f_bavail",
-                "f_bfree",
-                "f_blocks",
-                "f_bsize",
-                "f_favail",
-                "f_ffree",
-                "f_files",
-                "f_flag",
-                "f_frsize",
-                "f_namemax",
-            )
-        }
-        # TODO
-
-        # Todo: Remove some keys from above's list and set them here
-        # Deal with the case that that path is a dummy and the case
-        # that it is not
-        # stat_info[""]
-
-        return stat_info
+        return self.cache.statfs(path)
 
     @on_cache_path  # links are always local
     def readlink(self, path):
