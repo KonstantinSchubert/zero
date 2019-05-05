@@ -8,14 +8,8 @@ def get_config():
         return yaml.load(config)
 
 
-def parse_fuse_args():
+def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("mountpoint", type=str, help="Mountpoint")
-    parser.add_argument("cache_folder", type=str, help="Cache folder")
-    return parser.parse_args()
-
-
-def parse_worker_args():
-    parser = argparse.ArgumentParser()
     parser.add_argument("cache_folder", type=str, help="Cache folder")
     return parser.parse_args()

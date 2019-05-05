@@ -17,11 +17,13 @@ setup(
         "b2==1.1.0",
         "pyyaml==3.12",
         "portalocker==1.2.1",
+        "redis",
     ],
     include_package_data=True,
     zip_safe=True,
     entry_points={
         "console_scripts": [
+            "zero = zero.main:main",
             "zero-fuse = zero.main:fuse_main",
             "zero-worker = zero.main:worker_main",
             "debug-delete-everything = zero.main:reset_all",

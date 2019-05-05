@@ -18,16 +18,16 @@ class Ranker:
             self._record_access_time(inode)
             self.rank_store.record_access(inode, time.time())
 
+    def handle_inode_delete(self, inode):
+        """Update ranking in reaction to a file being deleted"""
+        self.rank_store.remove_inode(inode)
+
     def _record_access_time(self, inode):
         self.access_times[inode] = time.time()
 
     def _was_accessed_recently(self, inode):
         last_access = self.access_times.get(inode)
         return last_access is not None and (time.time() - last_access < 10 * 60)
-
-    def handle_inode_delete(self, inode):
-        """Update ranking in reaction to a file being deleted"""
-        self.rank_store.remove_inode(inode)
 
     def get_eviction_candidates(self, limit):
         return self.rank_store.get_clean_and_low_rank_inodes(limit)

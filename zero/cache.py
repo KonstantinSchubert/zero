@@ -221,9 +221,15 @@ class Cache:
                 "st_uid",
             )
         )
-        stat_dict["st_atime"] = self.metadata_store.get_access_time()
-        stat_dict["st_mtime"] = self.metadata_store.get_modification_time()
-        stat_dict["st_ctime"] = self.metadata_store.get_change_time()
+        if fuse_path[-1] != "/":
+            # If not a directory
+            inode = self.inode_store.get_inode(fuse_path)
+            stat_dict["st_atime"] = self.metadata_store.get_access_time(inode)
+            stat_dict["st_mtime"] = self.metadata_store.get_modification_time(
+                inode
+            )
+            stat_dict["st_ctime"] = self.metadata_store.get_change_time(inode)
+            print(stat_dict)
         return stat_dict
 
     @staticmethod

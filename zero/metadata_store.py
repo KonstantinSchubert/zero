@@ -56,10 +56,10 @@ class MetaData:
             self._set_column_to_now(TIMES.CTIME)
 
     def get_access_time(self, inode):
-        self._get_time(inode, TIMES.ATIME)
+        return self._get_time(inode, TIMES.ATIME)
 
     def get_modification_time(self, inode):
-        self._get_time(inode, TIMES.MTIME)
+        return self._get_time(inode, TIMES.MTIME)
 
     def get_change_time(self, inode):
         return self._get_time(inode, TIMES.CTIME)
@@ -69,7 +69,7 @@ class MetaData:
             """SELECT ? FROM metadata WHERE inode = ?""", (column, inode)
         )
         result = cursor.fetchone()
-        return result
+        return result or 0
 
     def _initialize_entry_if_not_exists(self, inode):
         now = datetime.now()
