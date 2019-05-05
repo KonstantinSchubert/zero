@@ -17,7 +17,6 @@ setup(
         "b2==1.1.0",
         "pyyaml==3.12",
         "portalocker==1.2.1",
-        "redis",
     ],
     include_package_data=True,
     zip_safe=True,

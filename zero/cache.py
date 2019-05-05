@@ -2,17 +2,17 @@ import os
 import errno
 from fuse import FuseOSError
 from .locking import PathLock
+from .events import FileAccessEvent, FileDeleteEvent
 
 
 class Cache:
 
     def __init__(
-        self, converter, state_store, inode_store, metadata_store, ranker, api
+        self, converter, state_store, inode_store, metadata_store, api
     ):
         self.converter = converter
         self.state_store = state_store
         self.inode_store = inode_store
-        self.ranker = ranker
         self.api = api
         self.metadata_store = metadata_store
         # instead of passing an instance here, sending a signal to the worker process might be more robust
@@ -70,9 +70,8 @@ class Cache:
             high_priority=True,
             acquisition_max_retries=100,
         ):
-            inode = self.inode_store.get_inode(path)
             self.metadata_store.record_access()
-            self.ranker.handle_inode_access(inode)
+            FileAccessEvent.submit(path)
             os.lseek(fh, offset, 0)
             return os.read(fh, size)
 
@@ -87,7 +86,7 @@ class Cache:
             self.metadata_store.record_content_modification(inode)
             cache_path = self._get_path(path)
             self.state_store.set_dirty(inode)
-            self.ranker.handle_inode_access(inode)
+            FileAccessEvent().submit(path)
             with open(cache_path, "r+") as f:
                 return f.truncate(length)
 
@@ -100,7 +99,7 @@ class Cache:
         ):
             inode = self.inode_store.get_inode(path)
             self.metadata_store.record_content_modification(inode)
-            self.ranker.handle_inode_access(inode)
+            FileAccessEvent().submit(path)
             os.lseek(fh, offset, 0)
             result = os.write(fh, data)
             self.state_store.set_dirty(inode)
@@ -115,7 +114,7 @@ class Cache:
         inode = self.inode_store.get_inode(path)
         self.metadata_store.record_content_modification(inode)
         self.state_store.set_dirty(inode)
-        self.ranker.handle_inode_access(inode)
+        FileAccessEvent.submit(path)
         return result
 
     def rename(self, old_path, new_path):
@@ -200,7 +199,7 @@ class Cache:
         cache_path = self._get_path_or_dummy(fuse_path)
         self.inode_store.delete_path(fuse_path)
         os.unlink(cache_path)  # May be actual file or dummy
-        self.ranker.handle_inode_delete(inode)
+        FileDeleteEvent().submit(fuse_path)
         self.state_store.set_todelete(inode)
 
     def getattributes(self, fuse_path):

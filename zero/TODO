@@ -1,0 +1,6 @@
+- Get rid of the inode abstraction:
+	- Use message queue to make the operations part independent of the ranker.
+    - The ranker should only be informed about changes based on fuse paths. It will not understand that two sym-linked files are the same. It does not need to. It also doesn't really need to follow all moves and deletes, immediately. It's okay if it's sometimes not up-to-date with stuff.
+    - Use meta-data-files in the cache file system instead of inode-keyed sqlite tables wherever possible.
+    - Extract the replace_dummy, create_dummy functions into their own module. Both cache and ranker can depend on this module. This module does not need to understand hard links. It can store the file content hash of the original file in the dummy file, and use the hash as well to de-duplicate the uploaded content.
+    - To handle hard links, instead of keeping track of them via the inode table, instead hard link the meta-data-files as well whenever they should be shared ((mtime, ctime, atime) is shared for hard-linked files, for example).

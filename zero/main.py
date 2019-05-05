@@ -52,12 +52,8 @@ def fuse_main(args, config):
     converter = PathConverter(args.cache_folder)
     state_store = StateStore(config["sqliteFileLocation"])
     inode_store = InodeStore(config["sqliteFileLocation"])
-    rank_store = RankStore(config["sqliteFileLocation"])
     metadata_store = MetaData(config["sqliteFileLocation"])
-    ranker = Ranker(rank_store, inode_store)
-    cache = Cache(
-        converter, state_store, inode_store, metadata_store, ranker, api
-    )
+    cache = Cache(converter, state_store, inode_store, metadata_store, api)
     filesystem = Filesystem(cache)
     FUSE(filesystem, args.mountpoint, nothreads=True, foreground=True)
 
@@ -82,16 +78,22 @@ def worker_main(args, config):
         converter, state_store, inode_store, metadata_store, ranker, api
     )
     worker = Worker(cache, api, target_disk_usage=config["targetDiskUsage"])
+
+
     while True:
         worker.run()
         time.sleep(10)
+
+    TODO: subcribe Ranker to events
+    TODO: create loop to pull and handle events in Ranker
+    - or maybe this Ranker handling stuff should go into yet another process?
 
 
 def reset_all():
     import shutil
     import os
 
-    args = parse_worker_args()
+    args = parse_args()
     config = get_config()
     shutil.rmtree(args.cache_folder)
     os.mkdir(args.cache_folder)
