@@ -16,7 +16,7 @@ def upload(api, file_to_upload, inode):
 
 class Worker:
 
-    def __init__(self, cache, api, target_disk_usage):
+    def __init__(self, cache, ranker, api, target_disk_usage):
         self.api = api
         self.target_disk_usage = target_disk_usage
         # Todo: Write methods in the cache class which wrap the
@@ -24,7 +24,7 @@ class Worker:
         self.converter = cache.converter
         self.state_store = cache.state_store
         self.inode_store = cache.inode_store
-        self.ranker = cache.ranker
+        self.ranker = ranker
         self.cache = cache
 
     def get_size_of_biggest_file(self):

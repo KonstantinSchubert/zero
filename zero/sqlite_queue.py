@@ -34,6 +34,12 @@ class _MessageTable:
         else:
             return result
 
+    def add_message(self, topic, message):
+        self.connection.execute(
+            """INSERT INTO messages (topic, message) VALUES (?,?)""",
+            (topic, message),
+        )
+
     def delete_messages_older_than_id(self, message_id):
         self.connection.execute(
             """DELETE from messsages WHERE id < ?""", (message_id,)
@@ -94,7 +100,7 @@ _message_table = _MessageTable(DB_NAME)
 
 
 def publish_message(topic, message):
-    _message_table.add_message(topic, message)
+    _message_table.add_message(topic=topic, message=message)
 
 
 def get_next_message(subscriber_id):

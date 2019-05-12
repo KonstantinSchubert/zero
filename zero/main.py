@@ -77,16 +77,17 @@ def worker_main(args, config):
     cache = Cache(
         converter, state_store, inode_store, metadata_store, ranker, api
     )
-    worker = Worker(cache, api, target_disk_usage=config["targetDiskUsage"])
-
+    worker = Worker(
+        cache, ranker, api, target_disk_usage=config["targetDiskUsage"]
+    )
 
     while True:
         worker.run()
         time.sleep(10)
 
-    TODO: subcribe Ranker to events
-    TODO: create loop to pull and handle events in Ranker
-    - or maybe this Ranker handling stuff should go into yet another process?
+    # TODO: subcribe Ranker to events
+    # TODO: create loop to pull and handle events in Ranker
+    # - or maybe this Ranker handling stuff should go into yet another process?
 
 
 def reset_all():

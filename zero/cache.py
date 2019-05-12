@@ -70,8 +70,9 @@ class Cache:
             high_priority=True,
             acquisition_max_retries=100,
         ):
-            self.metadata_store.record_access()
-            FileAccessEvent.submit(path)
+            inode = self.inode_store.get_inode(path)
+            self.metadata_store.record_access(inode)
+            FileAccessEvent.submit(path=path)
             os.lseek(fh, offset, 0)
             return os.read(fh, size)
 
@@ -86,7 +87,7 @@ class Cache:
             self.metadata_store.record_content_modification(inode)
             cache_path = self._get_path(path)
             self.state_store.set_dirty(inode)
-            FileAccessEvent().submit(path)
+            FileAccessEvent.submit(path=path)
             with open(cache_path, "r+") as f:
                 return f.truncate(length)
 
@@ -99,7 +100,7 @@ class Cache:
         ):
             inode = self.inode_store.get_inode(path)
             self.metadata_store.record_content_modification(inode)
-            FileAccessEvent().submit(path)
+            FileAccessEvent.submit(path=path)
             os.lseek(fh, offset, 0)
             result = os.write(fh, data)
             self.state_store.set_dirty(inode)
@@ -114,7 +115,7 @@ class Cache:
         inode = self.inode_store.get_inode(path)
         self.metadata_store.record_content_modification(inode)
         self.state_store.set_dirty(inode)
-        FileAccessEvent.submit(path)
+        FileAccessEvent.submit(path=path)
         return result
 
     def rename(self, old_path, new_path):

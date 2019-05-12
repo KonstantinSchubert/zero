@@ -39,14 +39,7 @@ class Filesystem(Operations):
     getxattr = None
 
     def link(self, target, source):
-        print("link")
-        # I can maintain a hard link table that basically lists for each path
-        # the  "inode" number ( doesn't need to be the real inode number )
-        # Then, whenever I replace a file with its dummy, I must consider this
-        # table to also configure all other hard links to that inode. Maybe on
-        # the remote end I can even use "inode" number as keys for the files
-        # that are uploaded. This does not solve hard links which point from
-        # my file system to another file system or vice versa
+        # Hard link support is not implemented, see readme.
         raise NotImplementedError
 
     listxattr = None

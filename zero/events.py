@@ -1,25 +1,27 @@
-import sqlite_queue as message_queue
+import zero.sqlite_queue as message_queue
 import json
 
 
 class Event:
-    TOPIC = ...
+    topic = ...
     arguments = ...
 
-    def submit(self, **kwargs):
+    @classmethod
+    def submit(cls, **kwargs):
         kwargs = {
-            key: value for key, value in kwargs.items() if key in self.arguments
+            key: value for key, value in kwargs.items() if key in cls.arguments
         }
-        message_queue.publish_message(self.TOPIC, json.dumps(kwargs))
+        print(cls.topic)
+        message_queue.publish_message(cls.topic, json.dumps(kwargs))
 
 
-class FileAccessEvent:
-    TOPIC = "FILE_WAS_ACCESSED"
+class FileAccessEvent(Event):
+    topic = "FILE_WAS_ACCESSED"
     arguments = ["path"]
 
 
-class FileDeleteEvent:
-    TOPIC = "FILE_WAS_DELETED"
+class FileDeleteEvent(Event):
+    topic = "FILE_WAS_DELETED"
     arguments = ["path"]
 
 

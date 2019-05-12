@@ -16,6 +16,7 @@ class TIMES:
 #             "st_size",
 #             "st_uid",
 
+
 class MetaData:
     """Stores meta data about the file such as file access times."""
 
@@ -40,20 +41,20 @@ class MetaData:
     def _record_access(self, inode):
         """Sets the atime"""
         with self.connection:
-            self._initialize_entry_if_not_exists()
-            self._set_column_to_now(TIMES.ATIME)
+            self._initialize_entry_if_not_exists(inode)
+            self._set_column_to_now(inode, TIMES.ATIME)
 
     def _record_modification(self, inode):
         """Sets the mtime"""
         with self.connection:
-            self._initialize_entry_if_not_exists()
-            self._set_column_to_now(TIMES.MTIME)
+            self._initialize_entry_if_not_exists(inode)
+            self._set_column_to_now(inode, TIMES.MTIME)
 
     def _record_change(self, inode):
         """Sets the ctime"""
         with self.connection:
-            self._initialize_entry_if_not_exists()
-            self._set_column_to_now(TIMES.CTIME)
+            self._initialize_entry_if_not_exists(inode)
+            self._set_column_to_now(inode, TIMES.CTIME)
 
     def get_access_time(self, inode):
         return self._get_time(inode, TIMES.ATIME)
@@ -81,6 +82,6 @@ class MetaData:
     def _set_column_to_now(self, inode: int, column_name: TIMES):
         now = datetime.now()
         self.connection.execute(
-            f"""UPDATE metadata set ? = ? WHERE inode = ?""",
-            (column_name, now, inode),
+            f"""UPDATE metadata set {column_name} = ? WHERE inode = ?""",
+            (now, inode),
         )
