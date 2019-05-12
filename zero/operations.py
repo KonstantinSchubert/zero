@@ -26,6 +26,7 @@ class Filesystem(Operations):
             raise FuseOSError(errno.EACCES)
 
     def getattr(self, path, fh=None):
+        print("getattr", path)
         return self.cache.getattributes(path)
 
     @on_cache_path_or_dummy
@@ -55,6 +56,7 @@ class Filesystem(Operations):
 
     @on_cache_path_or_dummy
     def readdir(self, path, fh):
+        print(path)
         return self.cache.list(path, fh)
 
     def release(self, path, fh):
@@ -86,6 +88,7 @@ class Filesystem(Operations):
         return self.cache.rename(old, new)
 
     def statfs(self, path):
+        print("statfs", path)
         return self.cache.statfs(path)
 
     @on_cache_path  # links are always local

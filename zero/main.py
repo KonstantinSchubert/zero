@@ -9,11 +9,9 @@ from .state_store import StateStore
 from .inode_store import InodeStore
 from .cache import Cache
 from .worker import Worker
-from .path_converter import PathConverter
 from .b2_api import FileAPI
 from .ranker import Ranker
 from .rank_store import RankStore
-from .metadata_store import MetaData
 from .b2_file_info_store import FileInfoStore
 
 import multiprocessing
@@ -49,11 +47,14 @@ def fuse_main(args, config):
         application_key=config["applicationKey"],
         bucket_id=config["bucketId"],
     )
-    converter = PathConverter(args.cache_folder)
     state_store = StateStore(config["sqliteFileLocation"])
     inode_store = InodeStore(config["sqliteFileLocation"])
-    metadata_store = MetaData(config["sqliteFileLocation"])
-    cache = Cache(converter, state_store, inode_store, metadata_store, api)
+    cache = Cache(
+        cache_folder=args.cache_folder,
+        state_store=state_store,
+        inode_store=inode_store,
+        api=api,
+    )
     filesystem = Filesystem(cache)
     FUSE(filesystem, args.mountpoint, nothreads=True, foreground=True)
 
@@ -68,13 +69,16 @@ def worker_main(args, config):
         bucket_id=config["bucketId"],
     )
 
-    converter = PathConverter(args.cache_folder)
     state_store = StateStore(config["sqliteFileLocation"])
     inode_store = InodeStore(config["sqliteFileLocation"])
     rank_store = RankStore(config["sqliteFileLocation"])
-    metadata_store = MetaData(config["sqliteFileLocation"])
     ranker = Ranker(rank_store, inode_store)
-    cache = Cache(converter, state_store, inode_store, metadata_store, api)
+    cache = Cache(
+        cache_folder=args.cache_folder,
+        state_store=state_store,
+        inode_store=inode_store,
+        api=api,
+    )
     worker = Worker(
         cache=cache,
         ranker=ranker,

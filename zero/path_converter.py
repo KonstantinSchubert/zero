@@ -1,4 +1,4 @@
-ANTI_COLLISION_HASH = ""
+from .globals import ANTI_COLLISION_HASH
 
 
 class PathConverter:

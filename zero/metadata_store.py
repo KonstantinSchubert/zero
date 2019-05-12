@@ -1,5 +1,7 @@
 from datetime import datetime
 import json
+from .path_converter import PathConverter
+from .globals import ANTI_COLLISION_HASH
 
 
 class TIMES:
@@ -17,20 +19,25 @@ class TIMES:
 #             "st_uid",
 
 
-ANTI_COLLISION_HASH = ""
 APPENDIX = "METADATA"
 
 
 class MetaData:
+
+    def __init__(self, cache_folder):
+        self.path_converter = PathConverter(cache_folder)
+
     """Stores meta data about the file such as file access times."""
 
     # TODO: These hooks need to get called in more places.
-    def record_content_modification(self, cache_path):
+    def record_content_modification(self, path):
+        cache_path = self.path_converter.to_cache_path(path)
         self._record_change(cache_path)
         self._record_modification(cache_path)
         self._record_access(cache_path)
 
-    def record_access(self, cache_path):
+    def record_access(self, path):
+        cache_path = self.path_converter.to_cache_path(path)
         self._record_access(cache_path)
 
     def _record_access(self, cache_path):
@@ -45,13 +52,16 @@ class MetaData:
         """Sets the ctime"""
         self._set_to_now(cache_path, TIMES.CTIME)
 
-    def get_access_time(self, cache_path):
+    def get_access_time(self, path):
+        cache_path = self.path_converter.to_cache_path(path)
         return self._get_time(cache_path, TIMES.ATIME)
 
-    def get_modification_time(self, cache_path):
+    def get_modification_time(self, path):
+        cache_path = self.path_converter.to_cache_path(path)
         return self._get_time(cache_path, TIMES.MTIME)
 
-    def get_change_time(self, cache_path):
+    def get_change_time(self, path):
+        cache_path = self.path_converter.to_cache_path(path)
         return self._get_time(cache_path, TIMES.CTIME)
 
     def _get_time(self, cache_path, property: TIMES):
@@ -73,7 +83,7 @@ class MetaData:
 
     def _set_to_now(self, cache_path: int, property: TIMES):
         with open(
-            _metadata_cache_path_from_cache_path(cache_path), "rw"
+            _metadata_cache_path_from_cache_path(cache_path), "r+"
         ) as metadata_file:
             data = json.load(metadata_file)
             data[property] = datetime.now().timestamp()

@@ -3,18 +3,20 @@ import errno
 from fuse import FuseOSError
 from .locking import PathLock
 from .events import FileAccessEvent, FileDeleteEvent
+from .metadata_store import MetaData, _metadata_cache_path_from_cache_path
+from .metadata_store import APPENDIX as METADATA_APPENDIX
+from .path_converter import PathConverter
+from .globals import ANTI_COLLISION_HASH
 
 
 class Cache:
 
-    def __init__(
-        self, converter, state_store, inode_store, metadata_store, api
-    ):
-        self.converter = converter
+    def __init__(self, cache_folder, state_store, inode_store, api):
+        self.converter = PathConverter(cache_folder)
         self.state_store = state_store
         self.inode_store = inode_store
         self.api = api
-        self.metadata_store = metadata_store
+        self.metadata_store = MetaData(cache_folder)
         # instead of passing an instance here, sending a signal to the worker process might be more robust
 
     def _get_path_or_dummy(self, fuse_path):
@@ -41,7 +43,11 @@ class Cache:
         return cache_path
 
     def _list_nodes_and_dummies(self, dir_path):
-        return os.listdir(dir_path)
+        return [
+            item
+            for item in os.listdir(dir_path)
+            if not ANTI_COLLISION_HASH + METADATA_APPENDIX in item
+        ]
 
     def list(self, cache_dir_path, fh):
         return [".", ".."] + [
@@ -70,8 +76,7 @@ class Cache:
             high_priority=True,
             acquisition_max_retries=100,
         ):
-            inode = self.inode_store.get_inode(path)
-            self.metadata_store.record_access(inode)
+            self.metadata_store.record_access(path=path)
             FileAccessEvent.submit(path=path)
             os.lseek(fh, offset, 0)
             return os.read(fh, size)
@@ -83,9 +88,9 @@ class Cache:
             high_priority=True,
             acquisition_max_retries=100,
         ):
+            self.metadata_store.record_content_modification(path=path)
             inode = self.inode_store.get_inode(path)
-            self.metadata_store.record_content_modification(inode)
-            cache_path = self._get_path(path)
+            cache_path = self.converter.to_cache_path(path)
             self.state_store.set_dirty(inode)
             FileAccessEvent.submit(path=path)
             with open(cache_path, "r+") as f:
@@ -99,7 +104,7 @@ class Cache:
             acquisition_max_retries=100,
         ):
             inode = self.inode_store.get_inode(path)
-            self.metadata_store.record_content_modification(inode)
+            self.metadata_store.record_content_modification(path=path)
             FileAccessEvent.submit(path=path)
             os.lseek(fh, offset, 0)
             result = os.write(fh, data)
@@ -114,7 +119,7 @@ class Cache:
         )
         self.inode_store.create_path(path)
         inode = self.inode_store.get_inode(path)
-        self.metadata_store.record_content_modification(inode)
+        self.metadata_store.record_content_modification(path=path)
         self.state_store.set_dirty(inode)
         FileAccessEvent.submit(path=path)
         return result
@@ -128,9 +133,9 @@ class Cache:
         # creates a new path in the inode_store and also locks it in a race-
         # free manner.  We need this in multiple parts of the code,
         # also here.
-        # I also need to update the ctime of the affected files
+        # TODO: I also need to update the ctime of the affected files
 
-        todo: also rename the metadata file
+        # TODO: How do I handle folder re-names here????
 
         with PathLock(
             old_path,
@@ -140,6 +145,7 @@ class Cache:
         ):
             existing_inode_at_new_path = self.inode_store.get_inode(new_path)
             if existing_inode_at_new_path:
+                # If something exists at the target path, we will overwrite it
                 if self.state_store.exists(existing_inode_at_new_path):
                     # inode is a file
                     with PathLock(
@@ -153,10 +159,14 @@ class Cache:
                     # inode is a folder:
                     self.rmdir(new_path)
 
+            old_cache_path = self.converter.to_cache_path(old_path)
+            new_cache_path = self.converter.to_cache_path(new_path)
             # Rename the cache files
+            os.rename(old_cache_path, new_cache_path)
+            # Rename the metadata file
             os.rename(
-                self.converter.to_cache_path(old_path),
-                self.converter.to_cache_path(new_path),
+                _metadata_cache_path_from_cache_path(old_cache_path),
+                _metadata_cache_path_from_cache_path(new_cache_path),
             )
 
             # Update the inode store
@@ -204,7 +214,7 @@ class Cache:
         cache_path = self._get_path_or_dummy(fuse_path)
         self.inode_store.delete_path(fuse_path)
         os.unlink(cache_path)  # May be actual file or dummy
-        FileDeleteEvent().submit(fuse_path)
+        FileDeleteEvent.submit(path=fuse_path)
         self.state_store.set_todelete(inode)
 
     def getattributes(self, fuse_path):
@@ -225,14 +235,17 @@ class Cache:
                 "st_uid",
             )
         )
-        if fuse_path[-1] != "/":
+        if not os.path.isdir(cache_path):
             # If not a directory
-            inode = self.inode_store.get_inode(fuse_path)
-            stat_dict["st_atime"] = self.metadata_store.get_access_time(inode)
-            stat_dict["st_mtime"] = self.metadata_store.get_modification_time(
-                inode
+            stat_dict["st_atime"] = self.metadata_store.get_access_time(
+                path=fuse_path
             )
-            stat_dict["st_ctime"] = self.metadata_store.get_change_time(inode)
+            stat_dict["st_mtime"] = self.metadata_store.get_modification_time(
+                path=fuse_path
+            )
+            stat_dict["st_ctime"] = self.metadata_store.get_change_time(
+                path=fuse_path
+            )
             print(stat_dict)
         return stat_dict
 
