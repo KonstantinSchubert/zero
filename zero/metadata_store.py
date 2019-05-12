@@ -1,5 +1,5 @@
-import sqlite3
 from datetime import datetime
+import json
 
 
 class TIMES:
@@ -17,73 +17,67 @@ class TIMES:
 #             "st_uid",
 
 
+ANTI_COLLISION_HASH = ""
+APPENDIX = "METADATA"
+
+
 class MetaData:
     """Stores meta data about the file such as file access times."""
 
-    def __init__(self, db_inode):
-        self.connection = sqlite3.connect(
-            db_inode, timeout=5, detect_types=sqlite3.PARSE_DECLTYPES
-        )
-        with self.connection:
-            self.connection.execute(
-                """CREATE TABLE IF NOT EXISTS metadata (inode integer primary key, atime timestamp default current_timestamp
-, mtime timestamp default current_timestamp, ctime timestamp default current_timestamp)"""
-            )
-
     # TODO: These hooks need to get called in more places.
-    def record_content_modification(self, inode):
-        self._record_change(inode)
-        self._record_modification(inode)
-        self._record_access(inode)
+    def record_content_modification(self, cache_path):
+        self._record_change(cache_path)
+        self._record_modification(cache_path)
+        self._record_access(cache_path)
 
-    def record_access(self, inode):
-        self._record_access(inode)
+    def record_access(self, cache_path):
+        self._record_access(cache_path)
 
-    def _record_access(self, inode):
+    def _record_access(self, cache_path):
         """Sets the atime"""
-        with self.connection:
-            self._initialize_entry_if_not_exists(inode)
-            self._set_column_to_now(inode, TIMES.ATIME)
+        self._set_to_now(cache_path, TIMES.ATIME)
 
-    def _record_modification(self, inode):
+    def _record_modification(self, cache_path):
         """Sets the mtime"""
-        with self.connection:
-            self._initialize_entry_if_not_exists(inode)
-            self._set_column_to_now(inode, TIMES.MTIME)
+        self._set_to_now(cache_path, TIMES.MTIME)
 
-    def _record_change(self, inode):
+    def _record_change(self, cache_path):
         """Sets the ctime"""
-        with self.connection:
-            self._initialize_entry_if_not_exists(inode)
-            self._set_column_to_now(inode, TIMES.CTIME)
+        self._set_to_now(cache_path, TIMES.CTIME)
 
-    def get_access_time(self, inode):
-        return self._get_time(inode, TIMES.ATIME)
+    def get_access_time(self, cache_path):
+        return self._get_time(cache_path, TIMES.ATIME)
 
-    def get_modification_time(self, inode):
-        return self._get_time(inode, TIMES.MTIME)
+    def get_modification_time(self, cache_path):
+        return self._get_time(cache_path, TIMES.MTIME)
 
-    def get_change_time(self, inode):
-        return self._get_time(inode, TIMES.CTIME)
+    def get_change_time(self, cache_path):
+        return self._get_time(cache_path, TIMES.CTIME)
 
-    def _get_time(self, inode, column_name: TIMES):
-        cursor = self.connection.execute(
-            f"""SELECT {column_name} FROM metadata WHERE inode = ?""", (inode,)
-        )
-        result = cursor.fetchone()
-        if result:
-            return result[0].timestamp()
-        else:
-            return 0
+    def _get_time(self, cache_path, property: TIMES):
+        with open(
+            _metadata_cache_path_from_cache_path(cache_path), "r"
+        ) as metadata_file:
+            return json.load(metadata_file)[property]
 
-    def _initialize_entry_if_not_exists(self, inode):
-        self.connection.execute(
-            """INSERT OR IGNORE INTO metadata (inode) VALUES (?)""", (inode,)
-        )
+    def create(self, cache_path):
+        with open(
+            _metadata_cache_path_from_cache_path(cache_path), "w+"
+        ) as metadata_file:
+            data = {
+                TIMES.CTIME: datetime.now().timestamp(),
+                TIMES.MTIME: datetime.now().timestamp(),
+                TIMES.ATIME: datetime.now().timestamp(),
+            }
+            json.dump(data, metadata_file)
 
-    def _set_column_to_now(self, inode: int, column_name: TIMES):
-        now = datetime.now()
-        self.connection.execute(
-            f"""UPDATE metadata set {column_name} = ? WHERE inode = ?""",
-            (now, inode),
-        )
+    def _set_to_now(self, cache_path: int, property: TIMES):
+        with open(
+            _metadata_cache_path_from_cache_path(cache_path), "rw"
+        ) as metadata_file:
+            data = json.load(metadata_file)
+            data[property] = datetime.now().timestamp()
+
+
+def _metadata_cache_path_from_cache_path(cache_path):
+    return cache_path + ANTI_COLLISION_HASH + APPENDIX

@@ -108,6 +108,7 @@ class Cache:
 
     def create(self, path, mode):
         cache_path = self.converter.to_cache_path(path)
+        self.metadata_store.create(cache_path)
         result = os.open(
             cache_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode
         )
@@ -128,6 +129,9 @@ class Cache:
         # free manner.  We need this in multiple parts of the code,
         # also here.
         # I also need to update the ctime of the affected files
+
+        todo: also rename the metadata file
+
         with PathLock(
             old_path,
             self.inode_store,
@@ -294,7 +298,6 @@ class Cache:
                 "f_namemax",
             )
         }
-        inode = self.inode_store.get_inode(path)
 
         # Todo: Remove some keys from above's list and set them here
         # With info from the metadata store.
