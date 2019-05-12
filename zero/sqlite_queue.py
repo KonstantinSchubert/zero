@@ -96,7 +96,7 @@ _subscriber_table = _SubscriberTable(DB_NAME)
 _message_table = _MessageTable(DB_NAME)
 
 
-# # Public methods and classes
+# Public methods and classes
 
 
 def publish_message(topic, message):

@@ -23,8 +23,6 @@ setup(
     entry_points={
         "console_scripts": [
             "zero = zero.main:main",
-            "zero-fuse = zero.main:fuse_main",
-            "zero-worker = zero.main:worker_main",
             "debug-delete-everything = zero.main:reset_all",
         ]
     },

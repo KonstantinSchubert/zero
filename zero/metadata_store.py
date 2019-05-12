@@ -26,7 +26,8 @@ class MetaData:
         )
         with self.connection:
             self.connection.execute(
-                """CREATE TABLE IF NOT EXISTS metadata (inode integer primary key, atime timestamp, mtime timestamp, ctime timestamp)"""
+                """CREATE TABLE IF NOT EXISTS metadata (inode integer primary key, atime timestamp default current_timestamp
+, mtime timestamp default current_timestamp, ctime timestamp default current_timestamp)"""
             )
 
     # TODO: These hooks need to get called in more places.
@@ -65,18 +66,19 @@ class MetaData:
     def get_change_time(self, inode):
         return self._get_time(inode, TIMES.CTIME)
 
-    def _get_time(self, inode, column):
+    def _get_time(self, inode, column_name: TIMES):
         cursor = self.connection.execute(
-            """SELECT ? FROM metadata WHERE inode = ?""", (column, inode)
+            f"""SELECT {column_name} FROM metadata WHERE inode = ?""", (inode,)
         )
         result = cursor.fetchone()
-        return result or 0
+        if result:
+            return result[0].timestamp()
+        else:
+            return 0
 
     def _initialize_entry_if_not_exists(self, inode):
-        now = datetime.now()
         self.connection.execute(
-            """INSERT OR IGNORE INTO metadata (inode, atime, mtime, ctime) VALUES (?,?,?,?)""",
-            (inode, now, now, now),
+            """INSERT OR IGNORE INTO metadata (inode) VALUES (?)""", (inode,)
         )
 
     def _set_column_to_now(self, inode: int, column_name: TIMES):

@@ -74,11 +74,12 @@ def worker_main(args, config):
     rank_store = RankStore(config["sqliteFileLocation"])
     metadata_store = MetaData(config["sqliteFileLocation"])
     ranker = Ranker(rank_store, inode_store)
-    cache = Cache(
-        converter, state_store, inode_store, metadata_store, ranker, api
-    )
+    cache = Cache(converter, state_store, inode_store, metadata_store, api)
     worker = Worker(
-        cache, ranker, api, target_disk_usage=config["targetDiskUsage"]
+        cache=cache,
+        ranker=ranker,
+        api=api,
+        target_disk_usage=config["targetDiskUsage"],
     )
 
     while True:

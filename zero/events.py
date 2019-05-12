@@ -11,7 +11,6 @@ class Event:
         kwargs = {
             key: value for key, value in kwargs.items() if key in cls.arguments
         }
-        print(cls.topic)
         message_queue.publish_message(cls.topic, json.dumps(kwargs))
 
 
