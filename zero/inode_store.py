@@ -16,6 +16,9 @@ class InodeStore:
             )
 
     def create_path(self, path):
+        # TODO: In order to replace the inode,
+        # we will first need to introduce a random unique identifier for each file that we store in a meta-file
+        # (see comment in `purge` method of worker.py)
         with self.connection:
             self._create_path(path)
 

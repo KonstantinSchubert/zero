@@ -102,12 +102,35 @@ class Worker:
 
     def purge(self):
         """Remove todelete files from remote"""
-        for inode in self.state_store.get_todelete_inodes():
-            print(f"Deleting inode {inode}")
-            try:
-                self._delete_inode(inode)
-            except NodeLockedException:
-                print(f"Could not delete: {inode} is locked")
+
+        # TODO:
+        # Instead of looking at the state_store (which I will try to remove in favor of a "DIRTY" file-based flag),
+        # listen to FileDeleteEvents.
+
+        # I must introduce a unique, random identifier for every file (similar to the inode, which was unique,
+        # but not random, and therefore needed to be managed via a table.)
+        # This unique, random identifier then needs to be included the in the FileDeleteEvent.
+
+        # This unique, random identifier should be used everywhere to identify a file towards the storage api.
+
+        # It must be random and can not be a hash, because a hash is not unique. Multiple files can have the same hash,
+        # concurrently or in short sequence, leading to all kinds of concurrency headaches.
+
+        # Using a unique random identifier, we can be sure that no file in future will contain the same identifier,
+        # so we can take our sweet time to tell the API to delete it.
+
+        # Of course we can still do de-duplicating with the storage api using reference coudning.
+
+        # We do NOT need to obtain a lock for deletion because if the file is re-created after the delete message/event
+        # has been dispatched, we can rely on the fact that the file will have new random identifier.
+
+        # OLD CODE:
+        # # for inode in self.state_store.get_todelete_inodes():
+        # #     print(f"Deleting inode {inode}")
+        # #     try:
+        # #         self._delete_inode(inode)
+        # #     except NodeLockedException:
+        # #         print(f"Could not delete: {inode} is locked")
 
     def evict(self, number_of_files):
         """Remove unneeded files from cache"""

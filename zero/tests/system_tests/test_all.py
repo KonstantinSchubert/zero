@@ -29,3 +29,4 @@ def test():
         print(counter)
         print(command)
         print(subprocess.check_output(command, shell=True))
+    raise

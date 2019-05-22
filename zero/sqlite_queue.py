@@ -22,11 +22,11 @@ class _MessageTable:
                 """CREATE TABLE IF NOT EXISTS messages (id integer primary key, topic text, message text)"""
             )
 
-    def get_next_message(self, last_message_id):
+    def get_next_message(self, last_message_id, topic):
         with self.connection:
             cursor = self.connection.execute(
-                """SELECT topic, message FROM messages WHERE id > ? ORDER BY id LIMIT 1""",
-                (last_message_id,),
+                """SELECT id, message FROM messages WHERE id > ? AND topic = ? ORDER BY id LIMIT 1""",
+                (last_message_id, topic),
             )
         result = cursor.fetchone()
         if result is None:
@@ -52,14 +52,15 @@ class _SubscriberTable:
         self.connection = sqlite3.connect(db_name, timeout=5)
         with self.connection:
             self.connection.execute(
-                """CREATE TABLE IF NOT EXISTS subscribers (id integer primary key autoincrement, last_received_message integer)"""
+                """CREATE TABLE IF NOT EXISTS subscribers (id integer primary key autoincrement, last_received_message integer, topic text)"""
             )
 
-    def add_subscriber(self):
+    def add_subscriber(self, topic):
         # Inserts row if it does not exist
         cursor = self.connection.cursor()
         cursor.execute(
-            """INSERT INTO subscribers (last_received_message,) VALUES (0,)"""
+            """INSERT INTO subscribers (last_received_message, topic) VALUES (0, ?)""",
+            (topic,),
         )
         subscriber_id = cursor.lastrowid
         return subscriber_id
@@ -76,13 +77,13 @@ class _SubscriberTable:
                 (message_id, subscriber_id),
             )
 
-    def get_id_of_last_received_message(self, subscriber_id):
+    def get_subscriber_status(self, subscriber_id):
         with self.connection:
             cursor = self.connection.execute(
-                """SELECT last_received_message FROM subscribers WHERE subscriber_id = ?""",
+                """SELECT last_received_message, topic FROM subscribers WHERE subscriber_id = ?""",
                 (subscriber_id,),
             )
-        return cursor.fetchone()[0]
+        return cursor.fetchone()
 
     def get_id_of_oldest_received_message(self):
         with self.connection:
@@ -104,14 +105,14 @@ def publish_message(topic, message):
 
 
 def get_next_message(subscriber_id):
-    id_oflast_received_message = _subscriber_table.get_id_of_last_received_message(
+    id_of_last_received_message, topic = _subscriber_table.get_subscriber_status(
         subscriber_id
     )
-    message_id, topic, message = _message_table.get_next_message(
-        id_oflast_received_message
+    message_id, message = _message_table.get_next_message(
+        id_of_last_received_message, topic
     )
     _subscriber_table.set_id_of_last_received_message(message_id)
-    return topic, message
+    return message
 
 
 def purge_messages():
@@ -121,8 +122,8 @@ def purge_messages():
     _message_table.delete_messages_older_than_id(oldest_received_message_id)
 
 
-def register_subscriber():
-    subscriber_id = _subscriber_table.add_subscriber()
+def register_subscriber(topic):
+    subscriber_id = _subscriber_table.add_subscriber(topic)
     return subscriber_id
 
 
@@ -132,8 +133,8 @@ def unregister_subscriber(subscriber_id):
 
 class Listener:
 
-    def __enter__(self):
-        self.subscriber_id = register_subscriber()
+    def __enter__(self, topic):
+        self.subscriber_id = register_subscriber(topic)
 
     def __exit__(self):
         unregister_subscriber(self.subscriber_id)

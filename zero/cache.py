@@ -135,18 +135,25 @@ class Cache:
         # also here.
         # TODO: I also need to update the ctime of the affected files
 
-        # TODO: How do I handle folder re-names here????
-
+        # TODO: Issue event to inform ranker about move?
+        old_cache_path = self.converter.to_cache_path(old_path)
+        new_cache_path = self.converter.to_cache_path(new_path)
         with PathLock(
             old_path,
             self.inode_store,
             acquisition_max_retries=100,
             high_priority=True,
         ):
-            existing_inode_at_new_path = self.inode_store.get_inode(new_path)
-            if existing_inode_at_new_path:
+            existing_inode_at_new_location = self.inode_store.get_inode(
+                new_path
+            )
+            if existing_inode_at_new_location:
                 # If something exists at the target path, we will overwrite it
-                if self.state_store.exists(existing_inode_at_new_path):
+                if os.path.isdir(new_cache_path):
+                    # inode is a folder:
+                    self.rmdir(new_path)
+                    # TODO: What if the target file contains files? Don't we have to delte them?
+                else:
                     # inode is a file
                     with PathLock(
                         new_path,
@@ -155,22 +162,23 @@ class Cache:
                         high_priority=True,
                     ):
                         self._delete_file(new_path)
-                else:
-                    # inode is a folder:
-                    self.rmdir(new_path)
 
-            old_cache_path = self.converter.to_cache_path(old_path)
-            new_cache_path = self.converter.to_cache_path(new_path)
-            # Rename the cache files
-            os.rename(old_cache_path, new_cache_path)
-            # Rename the metadata file
-            os.rename(
-                _metadata_cache_path_from_cache_path(old_cache_path),
-                _metadata_cache_path_from_cache_path(new_cache_path),
-            )
-
-            # Update the inode store
-            self.inode_store.rename_paths(old_path, new_path)
+            if os.path.isdir(old_cache_path):
+                # Rename the cache files
+                os.rename(old_cache_path, new_cache_path)
+                # Update the inode store
+                self.inode_store.rename_paths(old_path, new_path)
+            else:
+                # Rename the cache files
+                os.rename(old_cache_path, new_cache_path)
+                # Rename the metadata file
+                os.rename(
+                    _metadata_cache_path_from_cache_path(old_cache_path),
+                    _metadata_cache_path_from_cache_path(new_cache_path),
+                )
+                # self.metadata_store. -> record file move
+                # Update the inode store
+                self.inode_store.rename_paths(old_path, new_path)
 
     def mkdir(self, path, mode):
         print("mkdir", path)
