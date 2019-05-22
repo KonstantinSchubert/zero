@@ -12,7 +12,6 @@ from .worker import Worker
 from .b2_api import FileAPI
 from .ranker import Ranker
 from .rank_store import RankStore
-from .b2_file_info_store import FileInfoStore
 
 import multiprocessing
 
@@ -40,12 +39,11 @@ def main():
 
 def fuse_main(args, config):
 
-    file_info_store = FileInfoStore(config["sqliteFileLocation"])
     api = FileAPI(
-        file_info_store=file_info_store,
         account_id=config["accountId"],
         application_key=config["applicationKey"],
         bucket_id=config["bucketId"],
+        db_file=config["sqliteFileLocation"],
     )
     state_store = StateStore(config["sqliteFileLocation"])
     inode_store = InodeStore(config["sqliteFileLocation"])
@@ -61,12 +59,11 @@ def fuse_main(args, config):
 
 def worker_main(args, config):
 
-    file_info_store = FileInfoStore(config["sqliteFileLocation"])
     api = FileAPI(
-        file_info_store=file_info_store,
         account_id=config["accountId"],
         application_key=config["applicationKey"],
         bucket_id=config["bucketId"],
+        db_file=config["sqliteFileLocation"],
     )
 
     state_store = StateStore(config["sqliteFileLocation"])
