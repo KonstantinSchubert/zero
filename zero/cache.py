@@ -152,7 +152,7 @@ class Cache:
                 if os.path.isdir(new_cache_path):
                     # inode is a folder:
                     self.rmdir(new_path)
-                    # TODO: What if the target file contains files? Don't we have to delte them?
+                    # TODO: What if the target file contains files? Don't we have to delete them?
                 else:
                     # inode is a file
                     with PathLock(
@@ -222,6 +222,7 @@ class Cache:
         cache_path = self._get_path_or_dummy(fuse_path)
         self.inode_store.delete_path(fuse_path)
         os.unlink(cache_path)  # May be actual file or dummy
+        self.metadata_store.delete(fuse_path)
         FileDeleteEvent.submit(path=fuse_path)
         self.state_store.set_todelete(inode)
 

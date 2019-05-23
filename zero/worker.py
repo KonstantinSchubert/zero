@@ -3,15 +3,20 @@ import time
 import subprocess
 from multiprocessing import Process
 from .locking import NodeLockedException, PathLock, NodeLock
+from .remote_identifiers import RemoteIdentifiers
 
 
 logger = logging.getLogger("spam_application")
 
 
-def upload(api, file_to_upload, inode):
+def upload(api, file_to_upload, new_uuid, uuid_of_previous_version):
     # Maybe I can inline this helper method
     # exactly where it is used?
-    api.upload(file_to_upload, inode)
+    api.upload(
+        file=file_to_upload,
+        file_uuid=new_uuid,
+        file_uuid_to_replace=uuid_of_previous_version,
+    )
 
 
 class Worker:
@@ -26,6 +31,8 @@ class Worker:
         self.inode_store = cache.inode_store
         self.ranker = ranker
         self.cache = cache
+        cache_folder = self.converter.cache_folder  # Fix this hack
+        self.remote_identifiers = RemoteIdentifiers(cache_folder)
 
     def get_size_of_biggest_file(self):
         """In GB"""
@@ -59,6 +66,10 @@ class Worker:
             return
         path = self.inode_store.get_paths(inode)[0]
         with PathLock(path, self.inode_store) as lock:
+            uuid_of_previous_version = self.remote_identifiers.get_uuid_or_none(
+                path
+            )
+            new_uuid = RemoteIdentifiers.generate_uuid()
             with open(
                 self.converter.to_cache_path(path), "rb"
             ) as file_to_upload:
@@ -68,7 +79,13 @@ class Worker:
                 # the best option seems to be using python multiprocessing
                 # https://docs.python.org/3/library/multiprocessing.html#the-process-class
                 upload_process = Process(
-                    target=upload, args=(self.api, file_to_upload, inode)
+                    target=upload,
+                    args=(
+                        self.api,
+                        file_to_upload,
+                        new_uuid,
+                        uuid_of_previous_version,
+                    ),
                 )
                 upload_process.start()
                 while upload_process.is_alive():
@@ -80,6 +97,7 @@ class Worker:
                         return
                         # Might want to raise an exception here
                         # instead wich is caught one method above
+            self.remote_identifiers.set_uuid(path=path, uuid=new_uuid)
             self.state_store.set_clean(inode)
 
     def _delete_inode(self, inode):
@@ -88,8 +106,23 @@ class Worker:
                 # This can happen if the file was re-created in the mantime
                 print("Cannot delete inode because inode is not TODELETE")
                 return
-            self.api.delete(inode)
+            try:
+                path = self.inode_store.get_paths(inode)[0]
+            except IndexError:
+                # TODO: In future, this function will direclty get the path,
+                # so these kind of gymnastics won't need to happen
+                print("Path does not exist, not deleting")
+                return
+            file_uuid = self.remote_identifiers.get_uuid_or_none(path)
+            if file_uuid is None:
+                print(
+                    "Not deleting file because no file_uuid is found. "
+                    "It seems that it was never uploaded."
+                )
+                return
+            self.api.delete(file_uuid)
             self.state_store.set_deleted(inode)
+            self.remote_identifiers.delete(path)
 
     def clean(self):
         """Uplaod dirty files to remote"""
@@ -125,12 +158,12 @@ class Worker:
         # has been dispatched, we can rely on the fact that the file will have new random identifier.
 
         # OLD CODE:
-        # # for inode in self.state_store.get_todelete_inodes():
-        # #     print(f"Deleting inode {inode}")
-        # #     try:
-        # #         self._delete_inode(inode)
-        # #     except NodeLockedException:
-        # #         print(f"Could not delete: {inode} is locked")
+        for inode in self.state_store.get_todelete_inodes():
+            print(f"Deleting inode {inode}")
+            try:
+                self._delete_inode(inode)
+            except NodeLockedException:
+                print(f"Could not delete: {inode} is locked")
 
     def evict(self, number_of_files):
         """Remove unneeded files from cache"""

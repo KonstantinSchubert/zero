@@ -1,3 +1,4 @@
+import os
 from datetime import datetime
 import json
 from .path_converter import PathConverter
@@ -64,6 +65,10 @@ class MetaData:
         cache_path = self.path_converter.to_cache_path(path)
         return self._get_time(cache_path, TIMES.CTIME)
 
+    def delete(self, path):
+        cache_path = self.path_converter.to_cache_path(path)
+        return os.remove(_metadata_cache_path_from_cache_path(cache_path))
+
     def _get_time(self, cache_path, property: TIMES):
         with open(
             _metadata_cache_path_from_cache_path(cache_path), "r"
@@ -72,7 +77,7 @@ class MetaData:
 
     def create(self, cache_path):
         with open(
-            _metadata_cache_path_from_cache_path(cache_path), "w+"
+            _metadata_cache_path_from_cache_path(cache_path), "w"
         ) as metadata_file:
             data = {
                 TIMES.CTIME: datetime.now().timestamp(),
@@ -81,13 +86,14 @@ class MetaData:
             }
             json.dump(data, metadata_file)
 
-    def _set_to_now(self, cache_path: int, property: TIMES):
-        with open(
-            _metadata_cache_path_from_cache_path(cache_path), "r+"
-        ) as metadata_file:
+    def _set_to_now(self, cache_path: str, property: TIMES):
+        metadata_path = _metadata_cache_path_from_cache_path(cache_path)
+        with open(metadata_path, "r") as metadata_file:
             data = json.load(metadata_file)
-            data[property] = datetime.now().timestamp()
+        data[property] = datetime.now().timestamp()
+        with open(metadata_path, "w") as metadata_file:
+            json.dump(data, metadata_file)
 
 
 def _metadata_cache_path_from_cache_path(cache_path):
-    return cache_path + ANTI_COLLISION_HASH + APPENDIX
+    return f"{cache_path}_{ANTI_COLLISION_HASH}_{APPENDIX}"

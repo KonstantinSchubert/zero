@@ -64,3 +64,15 @@ There are 3 categories of tests:
 - Unit tests are testing the code on the function level
 - Integration tests are testing the interactions between bigger parts of the code and outside APIs. They may use the internet.
 - System tests are testing the software as a black box. They should continue working through a big refactor or even if everything was re-written in a different programming language. (There are no system tests yet as of now.)
+
+To run the system tests, first clear all data and start zero like this:
+
+```
+debug-delete-everything ~/playground/mountpoint ~/playground/to && zero ~/playground/mountpoint ~/playground/to
+```
+
+Then run the tests:
+
+```
+
+```

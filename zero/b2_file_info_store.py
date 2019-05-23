@@ -11,6 +11,7 @@ class FileInfoStore:
             )
 
     def set_file_id(self, file_uuid, file_id):
+        print(file_uuid, file_id)
         with self.connection:
             self.connection.execute(
                 """INSERT OR REPLACE INTO b2_file_info (file_uuid, file_id) VALUES (?, ?)""",
