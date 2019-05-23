@@ -12,6 +12,7 @@ from .worker import Worker
 from .b2_api import FileAPI
 from .ranker import Ranker
 from .rank_store import RankStore
+from .sqlite_queue import DB_NAME as QUEUE_DB_NAME
 
 import multiprocessing
 
@@ -33,11 +34,17 @@ def main():
         name="worker", target=worker_main, args=(args, config)
     )
 
+    deleter = multiprocessing.Process(
+        name="deleter", target=worker_delete_watcher, args=(args, config)
+    )
+
     fuse.start()
     worker.start()
+    deleter.start()
 
 
 def fuse_main(args, config):
+    print("Starting fuse main")
 
     api = FileAPI(
         account_id=config["accountId"],
@@ -58,6 +65,9 @@ def fuse_main(args, config):
 
 
 def worker_main(args, config):
+    print("Starting worker main")
+
+    # TODO: Extract different worker roles into their own processes
 
     api = FileAPI(
         account_id=config["accountId"],
@@ -92,6 +102,36 @@ def worker_main(args, config):
     # - or maybe this Ranker handling stuff should go into yet another process?
 
 
+def worker_delete_watcher(args, config):
+    print("Starting delete watcher")
+
+    api = FileAPI(
+        account_id=config["accountId"],
+        application_key=config["applicationKey"],
+        bucket_id=config["bucketId"],
+        db_file=config["sqliteFileLocation"],
+    )
+
+    state_store = StateStore(config["sqliteFileLocation"])
+    inode_store = InodeStore(config["sqliteFileLocation"])
+    rank_store = RankStore(config["sqliteFileLocation"])
+    ranker = Ranker(rank_store, inode_store)
+    cache = Cache(
+        cache_folder=args.cache_folder,
+        state_store=state_store,
+        inode_store=inode_store,
+        api=api,
+    )
+    worker = Worker(
+        cache=cache,
+        ranker=ranker,
+        api=api,
+        target_disk_usage=config["targetDiskUsage"],
+    )
+
+    worker.run_delete_watcher()
+
+
 def reset_all():
     import shutil
     import os
@@ -101,3 +141,4 @@ def reset_all():
     shutil.rmtree(args.cache_folder)
     os.mkdir(args.cache_folder)
     os.remove(config["sqliteFileLocation"])
+    os.remove(QUEUE_DB_NAME)

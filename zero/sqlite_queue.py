@@ -6,7 +6,7 @@ The code is not opimized for performance, in particular
 receiving messages could probably be optimized quite a bit.
 """
 
-DB_NAME = "queue.sqlite3"
+DB_NAME = "/home/kon/zero/queue.sqlite3"
 
 
 class NoNextMessage(Exception):
@@ -35,10 +35,12 @@ class _MessageTable:
             return result
 
     def add_message(self, topic, message):
+        print("executing")
         self.connection.execute(
             """INSERT INTO messages (topic, message) VALUES (?,?)""",
             (topic, message),
         )
+        print("executed")
 
     def delete_messages_older_than_id(self, message_id):
         self.connection.execute(
@@ -50,6 +52,7 @@ class _SubscriberTable:
 
     def __init__(self, db_name):
         self.connection = sqlite3.connect(db_name, timeout=5)
+        print("Instantiated!!")
         with self.connection:
             self.connection.execute(
                 """CREATE TABLE IF NOT EXISTS subscribers (id integer primary key autoincrement, last_received_message integer, topic text)"""
@@ -63,27 +66,36 @@ class _SubscriberTable:
             (topic,),
         )
         subscriber_id = cursor.lastrowid
+        print("ADDED SUBSCRIBER")
         return subscriber_id
 
     def remove_subscriber(self, subscriber_id):
         self.connection.execute(
             """DELETE from subscribers WHERE id = ?""", (subscriber_id,)
         )
+        print("REMOVED SUBSCRIBER")
 
     def set_id_of_last_received_message(self, subscriber_id, message_id):
         with self.connection:
             self.connection.execute(
-                """UPDATE subscribers SET last_received_message = ? WHERE subscriber_id = ?""",
+                """UPDATE subscribers SET last_received_message = ? WHERE id = ?""",
                 (message_id, subscriber_id),
             )
 
     def get_subscriber_status(self, subscriber_id):
+        print(subscriber_id)
         with self.connection:
             cursor = self.connection.execute(
-                """SELECT last_received_message, topic FROM subscribers WHERE subscriber_id = ?""",
+                """SELECT last_received_message, topic FROM subscribers WHERE id = ?""",
                 (subscriber_id,),
             )
-        return cursor.fetchone()
+            result = cursor.fetchone()
+            print("SUBSCRIBER STATUS", result)
+            if result is None:
+                raise Exception(
+                    "This should not happen. Subscriber must exist!"
+                )
+        return result
 
     def get_id_of_oldest_received_message(self):
         with self.connection:
@@ -93,18 +105,18 @@ class _SubscriberTable:
             return cursor.fetchone()[0]
 
 
-_subscriber_table = _SubscriberTable(DB_NAME)
-_message_table = _MessageTable(DB_NAME)
-
-
 # Public methods and classes
 
 
 def publish_message(topic, message):
+    _message_table = _MessageTable(DB_NAME)
+    print("ADDING MESSSAGE", message)
     _message_table.add_message(topic=topic, message=message)
 
 
 def get_next_message(subscriber_id):
+    _subscriber_table = _SubscriberTable(DB_NAME)
+    _message_table = _MessageTable(DB_NAME)
     id_of_last_received_message, topic = _subscriber_table.get_subscriber_status(
         subscriber_id
     )
@@ -112,10 +124,14 @@ def get_next_message(subscriber_id):
         id_of_last_received_message, topic
     )
     _subscriber_table.set_id_of_last_received_message(message_id)
+    print("GOT MESSSAGE", message)
     return message
 
 
 def purge_messages():
+    _subscriber_table = _SubscriberTable(DB_NAME)
+    _message_table = _MessageTable(DB_NAME)
+    print("PURGING")
     oldest_received_message_id = (
         _subscriber_table.get_id_of_oldest_received_message()
     )
@@ -123,26 +139,32 @@ def purge_messages():
 
 
 def register_subscriber(topic):
+    _subscriber_table = _SubscriberTable(DB_NAME)
     subscriber_id = _subscriber_table.add_subscriber(topic)
     return subscriber_id
 
 
 def unregister_subscriber(subscriber_id):
+    _subscriber_table = _SubscriberTable(DB_NAME)
     _subscriber_table.remove_subscriber(subscriber_id)
 
 
 class Listener:
 
-    def __enter__(self, topic):
-        self.subscriber_id = register_subscriber(topic)
+    def __init__(self, topic):
+        self.topic = topic
 
-    def __exit__(self):
+    def __enter__(self):
+        self.subscriber_id = register_subscriber(self.topic)
+        return self
+
+    def __exit__(self, *args):
         unregister_subscriber(self.subscriber_id)
 
     def yield_messages(self):
         try:
             while True:
                 yield get_next_message(self.subscriber_id)
-                purge_messages()  # This can of course be done more rarely
+                # purge_messages()  # This can of course be done more rarely
         except NoNextMessage:
             pass

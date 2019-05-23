@@ -6,3 +6,4 @@ b2_real_credentials.py
 test_cache_dir
 *.sqlite3
 *.sqlite3-journal
+*.pyc

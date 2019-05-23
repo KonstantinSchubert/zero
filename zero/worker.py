@@ -4,7 +4,7 @@ import subprocess
 from multiprocessing import Process
 from .locking import NodeLockedException, PathLock, NodeLock
 from .remote_identifiers import RemoteIdentifiers
-
+from .events import EventListener, FileDeleteEvent
 
 logger = logging.getLogger("spam_application")
 
@@ -100,29 +100,10 @@ class Worker:
             self.remote_identifiers.set_uuid(path=path, uuid=new_uuid)
             self.state_store.set_clean(inode)
 
-    def _delete_inode(self, inode):
-        with NodeLock(inode, exclusive=True):
-            if not self.state_store.is_todelete(inode):
-                # This can happen if the file was re-created in the mantime
-                print("Cannot delete inode because inode is not TODELETE")
-                return
-            try:
-                path = self.inode_store.get_paths(inode)[0]
-            except IndexError:
-                # TODO: In future, this function will direclty get the path,
-                # so these kind of gymnastics won't need to happen
-                print("Path does not exist, not deleting")
-                return
-            file_uuid = self.remote_identifiers.get_uuid_or_none(path)
-            if file_uuid is None:
-                print(
-                    "Not deleting file because no file_uuid is found. "
-                    "It seems that it was never uploaded."
-                )
-                return
+    def _delete_inode(self, uuid):
+
             self.api.delete(file_uuid)
-            self.state_store.set_deleted(inode)
-            self.remote_identifiers.delete(path)
+
 
     def clean(self):
         """Uplaod dirty files to remote"""
@@ -133,37 +114,17 @@ class Worker:
             except NodeLockedException:
                 print(f"Could not clean: {inode} is locked")
 
-    def purge(self):
-        """Remove todelete files from remote"""
-
-        # TODO:
-        # Instead of looking at the state_store (which I will try to remove in favor of a "DIRTY" file-based flag),
-        # listen to FileDeleteEvents.
-
-        # I must introduce a unique, random identifier for every file (similar to the inode, which was unique,
-        # but not random, and therefore needed to be managed via a table.)
-        # This unique, random identifier then needs to be included the in the FileDeleteEvent.
-
-        # This unique, random identifier should be used everywhere to identify a file towards the storage api.
-
-        # It must be random and can not be a hash, because a hash is not unique. Multiple files can have the same hash,
-        # concurrently or in short sequence, leading to all kinds of concurrency headaches.
-
-        # Using a unique random identifier, we can be sure that no file in future will contain the same identifier,
-        # so we can take our sweet time to tell the API to delete it.
-
-        # Of course we can still do de-duplicating with the storage api using reference coudning.
-
-        # We do NOT need to obtain a lock for deletion because if the file is re-created after the delete message/event
-        # has been dispatched, we can rely on the fact that the file will have new random identifier.
-
-        # OLD CODE:
-        for inode in self.state_store.get_todelete_inodes():
-            print(f"Deleting inode {inode}")
-            try:
-                self._delete_inode(inode)
-            except NodeLockedException:
-                print(f"Could not delete: {inode} is locked")
+    def run_delete_watcher(self):
+        with EventListener(FileDeleteEvent.topic) as deletion_listener:
+            while True:
+                time.sleep(1)
+                for message in deletion_listener.yield_events():
+                    print("DELETION!!!!!!")
+                    print(message)
+                    TODO: the message must contain the uuid of the file to be deleted already,
+                    since the path may no longer exist.
+                    if uuid is not None:
+                        self._delete_inode(uuid)
 
     def evict(self, number_of_files):
         """Remove unneeded files from cache"""
@@ -214,7 +175,7 @@ class Worker:
             self.prime(1)
 
     def run(self):
-        print("Running worker")
         self.clean()
-        self.purge()
+        # self.purge()
         self.order_cache()
+
