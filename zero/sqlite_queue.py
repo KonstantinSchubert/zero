@@ -60,14 +60,15 @@ class _SubscriberTable:
 
     def add_subscriber(self, topic):
         # Inserts row if it does not exist
-        cursor = self.connection.cursor()
-        cursor.execute(
-            """INSERT INTO subscribers (last_received_message, topic) VALUES (0, ?)""",
-            (topic,),
-        )
-        subscriber_id = cursor.lastrowid
-        print("ADDED SUBSCRIBER")
-        return subscriber_id
+        with self.connection:
+            cursor = self.connection.cursor()
+            cursor.execute(
+                """INSERT INTO subscribers (last_received_message, topic) VALUES (0, ?)""",
+                (topic,),
+            )
+            subscriber_id = cursor.lastrowid
+            print("ADDED SUBSCRIBER")
+            return subscriber_id
 
     def remove_subscriber(self, subscriber_id):
         self.connection.execute(

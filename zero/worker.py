@@ -102,8 +102,7 @@ class Worker:
 
     def _delete_inode(self, uuid):
 
-            self.api.delete(file_uuid)
-
+        self.api.delete(file_uuid)
 
     def clean(self):
         """Uplaod dirty files to remote"""
@@ -121,8 +120,8 @@ class Worker:
                 for message in deletion_listener.yield_events():
                     print("DELETION!!!!!!")
                     print(message)
-                    TODO: the message must contain the uuid of the file to be deleted already,
-                    since the path may no longer exist.
+                    # TODO: the message must contain the uuid of the file to be deleted already,
+                    # since the path may no longer exist.
                     if uuid is not None:
                         self._delete_inode(uuid)
 
@@ -178,4 +177,3 @@ class Worker:
         self.clean()
         # self.purge()
         self.order_cache()
-
