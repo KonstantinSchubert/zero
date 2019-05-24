@@ -21,7 +21,7 @@ class FileAccessEvent(Event):
 
 class FileDeleteEvent(Event):
     topic = "FILE_WAS_DELETED"
-    arguments = ["path"]
+    arguments = ["path", "uuid"]
 
 
 class EventListener(message_queue.Listener):

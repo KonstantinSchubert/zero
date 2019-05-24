@@ -2,7 +2,7 @@ import logging
 import time
 import subprocess
 from multiprocessing import Process
-from .locking import NodeLockedException, PathLock, NodeLock
+from .locking import NodeLockedException, PathLock
 from .remote_identifiers import RemoteIdentifiers
 from .events import EventListener, FileDeleteEvent
 
@@ -118,7 +118,7 @@ class Worker:
             while True:
                 time.sleep(1)
                 for message in deletion_listener.yield_events():
-                    print("DELETION!!!!!!")
+                    print("GOT DELETION MESSAGE!!!!!!")
                     print(message)
                     # TODO: the message must contain the uuid of the file to be deleted already,
                     # since the path may no longer exist.

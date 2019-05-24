@@ -28,31 +28,31 @@ class _MessageTable:
                 """SELECT id, message FROM messages WHERE id > ? AND topic = ? ORDER BY id LIMIT 1""",
                 (last_message_id, topic),
             )
-        result = cursor.fetchone()
+            result = cursor.fetchone()
         if result is None:
             raise NoNextMessage
         else:
+            print("GOT MESSAGE", result)
             return result
 
     def add_message(self, topic, message):
-        print("executing")
-        self.connection.execute(
-            """INSERT INTO messages (topic, message) VALUES (?,?)""",
-            (topic, message),
-        )
-        print("executed")
+        with self.connection:
+            self.connection.execute(
+                """INSERT INTO messages (topic, message) VALUES (?,?)""",
+                (topic, message),
+            )
 
     def delete_messages_older_than_id(self, message_id):
-        self.connection.execute(
-            """DELETE from messsages WHERE id < ?""", (message_id,)
-        )
+        with self.connection:
+            self.connection.execute(
+                """DELETE from messsages WHERE id < ?""", (message_id,)
+            )
 
 
 class _SubscriberTable:
 
     def __init__(self, db_name):
         self.connection = sqlite3.connect(db_name, timeout=5)
-        print("Instantiated!!")
         with self.connection:
             self.connection.execute(
                 """CREATE TABLE IF NOT EXISTS subscribers (id integer primary key autoincrement, last_received_message integer, topic text)"""
@@ -84,14 +84,12 @@ class _SubscriberTable:
             )
 
     def get_subscriber_status(self, subscriber_id):
-        print(subscriber_id)
         with self.connection:
             cursor = self.connection.execute(
                 """SELECT last_received_message, topic FROM subscribers WHERE id = ?""",
                 (subscriber_id,),
             )
             result = cursor.fetchone()
-            print("SUBSCRIBER STATUS", result)
             if result is None:
                 raise Exception(
                     "This should not happen. Subscriber must exist!"
@@ -111,7 +109,7 @@ class _SubscriberTable:
 
 def publish_message(topic, message):
     _message_table = _MessageTable(DB_NAME)
-    print("ADDING MESSSAGE", message)
+    print("ADDING MESSSAGE", topic, message)
     _message_table.add_message(topic=topic, message=message)
 
 

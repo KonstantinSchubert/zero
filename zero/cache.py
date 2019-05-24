@@ -6,6 +6,7 @@ from .events import FileAccessEvent, FileDeleteEvent
 from .metadata_store import MetaData, _metadata_cache_path_from_cache_path
 from .metadata_store import APPENDIX as METADATA_APPENDIX
 from .path_converter import PathConverter
+from .remote_identifiers import RemoteIdentifiers
 from .globals import ANTI_COLLISION_HASH
 
 
@@ -17,6 +18,7 @@ class Cache:
         self.inode_store = inode_store
         self.api = api
         self.metadata_store = MetaData(cache_folder)
+        self.remote_identifiers = RemoteIdentifiers(cache_folder)
         # instead of passing an instance here, sending a signal to the worker process might be more robust
 
     def _get_path_or_dummy(self, fuse_path):
@@ -225,8 +227,8 @@ class Cache:
         self.metadata_store.delete(fuse_path)
         uuid = self.remote_identifiers.get_uuid_or_none(fuse_path)
         if uuid:
-            self.remote_identifiers.delete(path)
-        FileDeleteEvent.submit(uuid=uuid, path=path)
+            self.remote_identifiers.delete(path=fuse_path)
+        FileDeleteEvent.submit(uuid=uuid, path=fuse_path)
         self.state_store.set_todelete(inode)
 
     def getattributes(self, fuse_path):
