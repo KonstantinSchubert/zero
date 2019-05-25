@@ -19,6 +19,11 @@ class FileAccessEvent(Event):
     arguments = ["path"]
 
 
+class FileUpdateOrCreateEvent(Event):
+    topic = "FILE_WAS_UPDATED_OR_CREATED"
+    arguments = ["path"]
+
+
 class FileDeleteEvent(Event):
     topic = "FILE_WAS_DELETED"
     arguments = ["path", "uuid"]

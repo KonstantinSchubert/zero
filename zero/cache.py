@@ -2,21 +2,24 @@ import os
 import errno
 from fuse import FuseOSError
 from .locking import PathLock
-from .events import FileAccessEvent, FileDeleteEvent
+from .events import FileAccessEvent, FileDeleteEvent, FileUpdateOrCreateEvent
 from .metadata_store import MetaData, _metadata_cache_path_from_cache_path
 from .path_converter import PathConverter
 from .remote_identifiers import RemoteIdentifiers
+from .dirty_flags import DirtyFlags
 from .globals import ANTI_COLLISION_HASH
+from .states import StateMachine
 
 
 class Cache:
 
-    def __init__(self, cache_folder, state_store, inode_store, api):
+    def __init__(self, cache_folder, inode_store, api):
+        self.cache_folder = cache_folder
         self.converter = PathConverter(cache_folder)
-        self.state_store = state_store
         self.inode_store = inode_store
         self.api = api
         self.metadata_store = MetaData(cache_folder)
+        self.states = StateMachine(cache_folder=cache_folder)
         self.remote_identifiers = RemoteIdentifiers(cache_folder)
         # instead of passing an instance here, sending a signal to the worker process might be more robust
 
@@ -40,7 +43,7 @@ class Cache:
         # This could also be solved with some kind of synchronous signal.
         cache_path = self.converter.to_cache_path(fuse_path)
         if os.path.exists(self.converter.add_dummy_ending(cache_path)):
-            self._replace_dummy(self.inode_store.get_inode(fuse_path))
+            self._replace_dummy(fuse_path)
         return cache_path
 
     def _list_files_and_dummies(self, dir_path):
@@ -90,9 +93,9 @@ class Cache:
             acquisition_max_retries=100,
         ):
             self.metadata_store.record_content_modification(path=path)
-            inode = self.inode_store.get_inode(path)
             cache_path = self.converter.to_cache_path(path)
-            self.state_store.set_dirty(inode)
+            self.states.clean_to_dirty(path)
+            FileUpdateOrCreateEvent.submit(path=path)
             FileAccessEvent.submit(path=path)
             with open(cache_path, "r+") as f:
                 return f.truncate(length)
@@ -104,24 +107,25 @@ class Cache:
             high_priority=True,
             acquisition_max_retries=100,
         ):
-            inode = self.inode_store.get_inode(path)
             self.metadata_store.record_content_modification(path=path)
             FileAccessEvent.submit(path=path)
             os.lseek(fh, offset, 0)
             result = os.write(fh, data)
-            self.state_store.set_dirty(inode)
+            self.states.clean_to_dirty(path)
+            FileUpdateOrCreateEvent.submit(path=path)
             return result
 
     def create(self, path, mode):
+        print("CREATING")
         cache_path = self.converter.to_cache_path(path)
         self.metadata_store.create(cache_path)
         result = os.open(
             cache_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode
         )
         self.inode_store.create_path(path)
-        inode = self.inode_store.get_inode(path)
         self.metadata_store.record_content_modification(path=path)
-        self.state_store.set_dirty(inode)
+        self.states.clean_to_dirty(path)
+        FileUpdateOrCreateEvent.submit(path=path)
         FileAccessEvent.submit(path=path)
         return result
 
@@ -221,16 +225,17 @@ class Cache:
     def _delete_file(self, fuse_path):
         cache_path = self._get_path_or_dummy(fuse_path)
         self.inode_store.delete_path(fuse_path)
-        os.unlink(cache_path)  # May be actual file or dummy
+        os.unlink(cache_path)
+
+        # Delete all flags. This is a bit hacky and should be cleaned up
         self.metadata_store.delete(fuse_path)
+        DirtyFlags(self.cache_folder).remove_dirty_flag(fuse_path)
+        ##
+
         uuid = self.remote_identifiers.get_uuid_or_none(fuse_path)
         if uuid:
             self.remote_identifiers.delete(path=fuse_path)
         FileDeleteEvent.submit(uuid=uuid, path=fuse_path)
-
-        # To be removed:
-        inode = self.inode_store.get_inode(fuse_path)
-        self.state_store.set_deleted(inode)
 
     def getattributes(self, fuse_path):
         cache_path = self._get_path_or_dummy(fuse_path)
@@ -271,42 +276,34 @@ class Cache:
     def replace_dummy(self, inode):
         path = self.inode_store.get_paths(inode)[0]
         with PathLock(path, self.inode_store):
-            self._replace_dummy(inode)
+            self._replace_dummy(path)
 
-    def _replace_dummy(self, inode):
-        print(f"Replacing dummy [{inode}]")
-        if not self.state_store.is_remote(inode):
+    def _replace_dummy(self, path):
+        print(f"Replacing dummy [path]")
+        if not self.states.current_stae_is_remote(path):
             print(
-                f"Cannot replace dummy for inode {inode}"
-                "because inode is not remote."
+                f"Cannot replace dummy for path {path}"
+                "because file is not remote."
             )
-        path = self.inode_store.get_paths(inode)[0]
         cache_path = self.converter.to_cache_path(path)
-        dummy_path = self.converter.add_dummy_ending(cache_path)
-        # Rename should already preserve permissions, creation time, user and group.
-        # So we do not need to set them here.
-        os.rename(dummy_path, cache_path)
+        uuid = self.remote_identifiers.get_uuid_or_none(path)
         with open(cache_path, "w+b") as file:
             try:
-                file.write(self.api.download(inode).read())
+                file.write(self.api.download(uuid).read())
             except ConnectionError:
                 raise FuseOSError(errno.ENETUNREACH)
-        self.state_store.set_downloaded(inode)
+        self.states.remote_to_clean(path)
 
     def create_dummy(self, inode):
         path = self.inode_store.get_paths(inode)[0]
         with PathLock(path, self.inode_store):
             # This can happen if the file was written to in the meantime
-            if not self.state_store.is_clean(inode):
+            if not self.states.current_state_is_clean(path):
                 print(
                     "Cannot create dummy for inode because inode is not clean"
                 )
                 return
-            cache_path = self.converter.to_cache_path(path)
-            dummy_path = self.converter.add_dummy_ending(cache_path)
-            os.rename(cache_path, dummy_path)
-            # Re-name to preserve file permissions, user id.
-            self.state_store.set_remote(inode)
+            self.states.clean_to_remote(path)
 
     def statfs(self, path):
         cache_path = self._get_path_or_dummy(path)

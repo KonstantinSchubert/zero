@@ -5,7 +5,6 @@ from fuse import FUSE
 
 
 from .operations import Filesystem
-from .state_store import StateStore
 from .inode_store import InodeStore
 from .cache import Cache
 from .worker import Worker
@@ -30,17 +29,22 @@ def main():
     fuse = multiprocessing.Process(
         name="fuse", target=fuse_main, args=(args, config)
     )
-    worker = multiprocessing.Process(
-        name="worker", target=worker_main, args=(args, config)
-    )
+    # worker = multiprocessing.Process(
+    #     name="worker", target=worker_main, args=(args, config)
+    # )
 
     deleter = multiprocessing.Process(
         name="deleter", target=worker_delete_watcher, args=(args, config)
     )
 
+    cleaner = multiprocessing.Process(
+        name="cleaner", target=worker_clean_watcher, args=(args, config)
+    )
+
     fuse.start()
-    worker.start()
+    # worker.start()
     deleter.start()
+    cleaner.start()
 
 
 def fuse_main(args, config):
@@ -52,19 +56,15 @@ def fuse_main(args, config):
         bucket_id=config["bucketId"],
         db_file=config["sqliteFileLocation"],
     )
-    state_store = StateStore(config["sqliteFileLocation"])
     inode_store = InodeStore(config["sqliteFileLocation"])
     cache = Cache(
-        cache_folder=args.cache_folder,
-        state_store=state_store,
-        inode_store=inode_store,
-        api=api,
+        cache_folder=args.cache_folder, inode_store=inode_store, api=api
     )
     filesystem = Filesystem(cache)
     FUSE(filesystem, args.mountpoint, nothreads=True, foreground=True)
 
 
-def worker_main(args, config):
+def worker_clean_watcher(args, config):
     print("Starting worker main")
 
     # TODO: Extract different worker roles into their own processes
@@ -76,30 +76,25 @@ def worker_main(args, config):
         db_file=config["sqliteFileLocation"],
     )
 
-    state_store = StateStore(config["sqliteFileLocation"])
     inode_store = InodeStore(config["sqliteFileLocation"])
-    rank_store = RankStore(config["sqliteFileLocation"])
-    ranker = Ranker(rank_store, inode_store)
+    # rank_store = RankStore(config["sqliteFileLocation"])
+    # ranker = Ranker(rank_store, inode_store)
     cache = Cache(
-        cache_folder=args.cache_folder,
-        state_store=state_store,
-        inode_store=inode_store,
-        api=api,
+        cache_folder=args.cache_folder, inode_store=inode_store, api=api
     )
     worker = Worker(
         cache=cache,
-        ranker=ranker,
+        # ranker=ranker,
         api=api,
         target_disk_usage=config["targetDiskUsage"],
     )
 
-    while True:
-        worker.run()
-        time.sleep(10)
+    worker.run_clean_watcher()
 
-    # TODO: subcribe Ranker to events
-    # TODO: create loop to pull and handle events in Ranker
-    # - or maybe this Ranker handling stuff should go into yet another process?
+
+# TODO: subcribe Ranker to events
+# TODO: create loop to pull and handle events in Ranker
+# - or maybe this Ranker handling stuff should go into yet another process?
 
 
 def worker_delete_watcher(args, config):
@@ -112,19 +107,15 @@ def worker_delete_watcher(args, config):
         db_file=config["sqliteFileLocation"],
     )
 
-    state_store = StateStore(config["sqliteFileLocation"])
     inode_store = InodeStore(config["sqliteFileLocation"])
-    rank_store = RankStore(config["sqliteFileLocation"])
-    ranker = Ranker(rank_store, inode_store)
+    # rank_store = RankStore(config["sqliteFileLocation"])
+    # ranker = Ranker(rank_store, inode_store)
     cache = Cache(
-        cache_folder=args.cache_folder,
-        state_store=state_store,
-        inode_store=inode_store,
-        api=api,
+        cache_folder=args.cache_folder, inode_store=inode_store, api=api
     )
     worker = Worker(
         cache=cache,
-        ranker=ranker,
+        # ranker=ranker,
         api=api,
         target_disk_usage=config["targetDiskUsage"],
     )

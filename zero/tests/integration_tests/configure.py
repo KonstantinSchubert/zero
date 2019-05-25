@@ -5,7 +5,6 @@ from ..utils import remove_recursive_silently
 from zero.worker import Worker
 from zero.cache import Cache
 from zero.path_converter import PathConverter
-from zero.state_store import StateStore
 from zero.inode_store import InodeStore
 from zero.rank_store import RankStore
 from zero.ranker import Ranker
@@ -24,14 +23,12 @@ class IntegrationTestingContext:
         self.api = api
         os.mkdir(CACHE_DIR)
         self.converter = PathConverter(CACHE_DIR)
-        self.state_store = StateStore(DB_PATH)
         self.inode_store = InodeStore(DB_PATH)
         self.rank_store = RankStore(DB_PATH)
         self.metadata_store = MetaData(DB_PATH)
         self.ranker = Ranker(self.rank_store, self.inode_store)
         self.cache = Cache(
             converter=self.converter,
-            state_store=self.state_store,
             inode_store=self.inode_store,
             metadata_store=self.metadata_store,
             api=self.api,
