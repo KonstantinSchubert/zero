@@ -4,7 +4,6 @@ from fuse import FuseOSError
 from .locking import PathLock
 from .events import FileAccessEvent, FileDeleteEvent
 from .metadata_store import MetaData, _metadata_cache_path_from_cache_path
-from .metadata_store import APPENDIX as METADATA_APPENDIX
 from .path_converter import PathConverter
 from .remote_identifiers import RemoteIdentifiers
 from .globals import ANTI_COLLISION_HASH
@@ -44,17 +43,17 @@ class Cache:
             self._replace_dummy(self.inode_store.get_inode(fuse_path))
         return cache_path
 
-    def _list_nodes_and_dummies(self, dir_path):
+    def _list_files_and_dummies(self, dir_path):
         return [
             item
             for item in os.listdir(dir_path)
-            if not ANTI_COLLISION_HASH + METADATA_APPENDIX in item
+            if ANTI_COLLISION_HASH not in item
         ]
 
     def list(self, cache_dir_path, fh):
         return [".", ".."] + [
             self.converter.strip_dummy_ending(path)
-            for path in self._list_nodes_and_dummies(cache_dir_path)
+            for path in self._list_files_and_dummies(cache_dir_path)
         ]
 
     def open(self, path, flags):

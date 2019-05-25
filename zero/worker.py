@@ -34,6 +34,22 @@ class Worker:
         cache_folder = self.converter.cache_folder  # Fix this hack
         self.remote_identifiers = RemoteIdentifiers(cache_folder)
 
+    def run(self):
+        self.clean()
+        # self.purge()
+        self.order_cache()
+
+    def run_delete_watcher(self):
+        with EventListener(FileDeleteEvent.topic) as deletion_listener:
+            while True:
+                time.sleep(1)
+                for message in deletion_listener.yield_events():
+                    uuid = message["uuid"]
+                    # TODO: the message must contain the uuid of the file to be deleted already,
+                    # since the path may no longer exist.
+                    if uuid is not None:
+                        self.api.delete(uuid)
+
     def get_size_of_biggest_file(self):
         """In GB"""
         # TODO: Implement this in a reasonably efficient way by caching file sizes
@@ -109,18 +125,6 @@ class Worker:
             except NodeLockedException:
                 print(f"Could not clean: {inode} is locked")
 
-    def run_delete_watcher(self):
-        with EventListener(FileDeleteEvent.topic) as deletion_listener:
-            while True:
-                time.sleep(1)
-                for message in deletion_listener.yield_events():
-                    print(message)
-                    uuid = message["uuid"]
-                    # TODO: the message must contain the uuid of the file to be deleted already,
-                    # since the path may no longer exist.
-                    if uuid is not None:
-                        self.api.delete(uuid)
-
     def evict(self, number_of_files):
         """Remove unneeded files from cache"""
         # To decide which files to evict,
@@ -168,8 +172,3 @@ class Worker:
         else:
             print("Priming")
             self.prime(1)
-
-    def run(self):
-        self.clean()
-        # self.purge()
-        self.order_cache()

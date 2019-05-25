@@ -1,11 +1,11 @@
-from .globals import ANTI_COLLISION_HASH
+DUMMY_ANTI_COLLISION_STRING = "wme6mYV2"
 
 
 class PathConverter:
 
     def __init__(self, cache_folder):
         self.cache_folder = cache_folder
-        self.anti_collision_hash = ANTI_COLLISION_HASH
+        self.anti_collision_hash = DUMMY_ANTI_COLLISION_STRING
 
     def to_cache_path(self, fuse_path):
         """Returns the path in the cache file system corresponding
