@@ -9,7 +9,6 @@ class STATES:
     CLEAN = "CLEAN"  # File exists locally and remotely and is clean
     REMOTE = "REMOTE"  # File exists only remotely
     DIRTY = "DIRTY"  # File exists locally and is dirty
-    TODELETE = "TODELETE"  # File exists only remotely and should be deleted
 
 
 class StateStore:
@@ -38,12 +37,7 @@ class StateStore:
         with self.connection:
             self._transition(
                 inode,
-                previous_states=[
-                    STATES.CLEAN,
-                    STATES.DIRTY,
-                    STATES.TODELETE,
-                    None,
-                ],
+                previous_states=[STATES.CLEAN, STATES.DIRTY, None],
                 next_state=STATES.DIRTY,
             )
 
@@ -53,30 +47,21 @@ class StateStore:
                 inode, previous_states=[STATES.DIRTY], next_state=STATES.CLEAN
             )
 
-    def set_todelete(self, inode):
+    def set_deleted(self, inode):
         with self.connection:
             self._transition(
                 inode,
                 previous_states=[
                     STATES.CLEAN,
                     STATES.DIRTY,
-                    STATES.TODELETE,
                     STATES.REMOTE,
+                    None,
                 ],
-                next_state=STATES.TODELETE,
-            )
-
-    def set_deleted(self, inode):
-        with self.connection:
-            self._transition(
-                inode, previous_states=[STATES.TODELETE], next_state=None
+                next_state=None,
             )
 
     def get_dirty_inodes(self):
         yield from self.get_inodes_in_state(state=STATES.DIRTY)
-
-    def get_todelete_inodes(self):
-        yield from self.get_inodes_in_state(state=STATES.TODELETE)
 
     def get_inodes_in_state(self, state):
         with self.connection:
@@ -110,15 +95,6 @@ class StateStore:
         try:
             with self.connection:
                 self._assert_inode_has_allowed_state(inode, [STATES.DIRTY])
-        except IllegalTransitionException:
-            return False
-        return True
-
-    def is_todelete(self, inode):
-        # ugly,need to refactor this
-        try:
-            with self.connection:
-                self._assert_inode_has_allowed_state(inode, [STATES.TODELETE])
         except IllegalTransitionException:
             return False
         return True

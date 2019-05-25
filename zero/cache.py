@@ -219,7 +219,6 @@ class Cache:
                 self._delete_file(fuse_path)
 
     def _delete_file(self, fuse_path):
-        inode = self.inode_store.get_inode(fuse_path)
         cache_path = self._get_path_or_dummy(fuse_path)
         self.inode_store.delete_path(fuse_path)
         os.unlink(cache_path)  # May be actual file or dummy
@@ -228,7 +227,10 @@ class Cache:
         if uuid:
             self.remote_identifiers.delete(path=fuse_path)
         FileDeleteEvent.submit(uuid=uuid, path=fuse_path)
-        self.state_store.set_todelete(inode)
+
+        # To be removed:
+        inode = self.inode_store.get_inode(fuse_path)
+        self.state_store.set_deleted(inode)
 
     def getattributes(self, fuse_path):
         cache_path = self._get_path_or_dummy(fuse_path)
