@@ -35,6 +35,7 @@ class _MessageTable:
             return result
 
     def add_message(self, topic, message):
+        # print(f"Adding message {message} on {topic}")
         with self.connection:
             self.connection.execute(
                 """INSERT INTO messages (topic, message) VALUES (?,?)""",

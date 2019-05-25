@@ -66,6 +66,7 @@ class Cache:
             self.inode_store,
             high_priority=True,
             acquisition_max_retries=100,
+            lock_creator="CACHE OPEN",
         ):
             cache_path = self._get_path(path)
             print(cache_path)
@@ -79,6 +80,7 @@ class Cache:
             exclusive_lock_on_leaf=False,
             high_priority=True,
             acquisition_max_retries=100,
+            lock_creator="CACHE READ",
         ):
             self.metadata_store.record_access(path=path)
             FileAccessEvent.submit(path=path)
@@ -86,6 +88,7 @@ class Cache:
             return os.read(fh, size)
 
     def truncate(self, path, length):
+        print("truncate")
         with PathLock(
             path,
             self.inode_store,
@@ -94,24 +97,25 @@ class Cache:
         ):
             self.metadata_store.record_content_modification(path=path)
             cache_path = self.converter.to_cache_path(path)
-            self.states.clean_to_dirty(path)
             FileUpdateOrCreateEvent.submit(path=path)
             FileAccessEvent.submit(path=path)
             with open(cache_path, "r+") as f:
                 return f.truncate(length)
 
     def write(self, path, data, offset, fh):
+        print("write")
         with PathLock(
             path,
             self.inode_store,
             high_priority=True,
             acquisition_max_retries=100,
+            lock_creator="CACHE WRITE",
         ):
             self.metadata_store.record_content_modification(path=path)
             FileAccessEvent.submit(path=path)
             os.lseek(fh, offset, 0)
             result = os.write(fh, data)
-            self.states.clean_to_dirty(path)
+            self.states.dirty_or_clean_to_dirty(path)
             FileUpdateOrCreateEvent.submit(path=path)
             return result
 
@@ -130,6 +134,7 @@ class Cache:
         return result
 
     def rename(self, old_path, new_path):
+        print("rename")
         # TODO: This function has a bunch of
         # race conditions, especially
         # if we assume multiple fuse threads
@@ -148,6 +153,7 @@ class Cache:
             self.inode_store,
             acquisition_max_retries=100,
             high_priority=True,
+            lock_creator="CACHE RENAME",
         ):
             existing_inode_at_new_location = self.inode_store.get_inode(
                 new_path
@@ -177,9 +183,18 @@ class Cache:
                 # Rename the cache files
                 os.rename(old_cache_path, new_cache_path)
                 # Rename the metadata file
+                # TODO : This is hacky
                 os.rename(
                     _metadata_cache_path_from_cache_path(old_cache_path),
                     _metadata_cache_path_from_cache_path(new_cache_path),
+                )
+                os.rename(
+                    DirtyFlags(
+                        self.cache_folder
+                    )._dirty_flag_path_from_fuse_path(old_path),
+                    DirtyFlags(
+                        self.cache_folder
+                    )._dirty_flag_path_from_fuse_path(new_path),
                 )
                 # self.metadata_store. -> record file move
                 # Update the inode store
@@ -203,11 +218,13 @@ class Cache:
             self.inode_store,
             high_priority=True,
             acquisition_max_retries=100,
+            lock_creator="CACHE RMDIR",
         ):
             self.inode_store.delete_path(fuse_path)
             return os.rmdir(cache_path, *args, **kwargs)
 
     def unlink(self, fuse_path):
+        print(f"unlink {fuse_path}")
         cache_path = self._get_path_or_dummy(fuse_path)
         is_link = self.is_link(cache_path)
         if is_link:
@@ -219,23 +236,30 @@ class Cache:
                 self.inode_store,
                 acquisition_max_retries=10,
                 high_priority=True,
+                lock_creator="CACHE UNLINK",
             ):
                 self._delete_file(fuse_path)
 
     def _delete_file(self, fuse_path):
-        cache_path = self._get_path_or_dummy(fuse_path)
-        self.inode_store.delete_path(fuse_path)
-        os.unlink(cache_path)
+        try:
+            self.inode_store.delete_path(fuse_path)
+            os.unlink(self._get_path_or_dummy(fuse_path))
 
-        # Delete all flags. This is a bit hacky and should be cleaned up
-        self.metadata_store.delete(fuse_path)
-        DirtyFlags(self.cache_folder).remove_dirty_flag(fuse_path)
-        ##
+            # Delete all flags. This is hacky and should be cleaned up
+            self.metadata_store.delete(fuse_path)
+            try:
+                DirtyFlags(self.cache_folder).remove_dirty_flag(fuse_path)
+            except Exception:
+                # There may be no dirty flag
+                pass
+            ##
 
-        uuid = self.remote_identifiers.get_uuid_or_none(fuse_path)
-        if uuid:
-            self.remote_identifiers.delete(path=fuse_path)
-        FileDeleteEvent.submit(uuid=uuid, path=fuse_path)
+            uuid = self.remote_identifiers.get_uuid_or_none(fuse_path)
+            if uuid:
+                self.remote_identifiers.delete(path=fuse_path)
+            FileDeleteEvent.submit(uuid=uuid, path=fuse_path)
+        except Exception as e:
+            print(e)
 
     def getattributes(self, fuse_path):
         cache_path = self._get_path_or_dummy(fuse_path)

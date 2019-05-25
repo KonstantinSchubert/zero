@@ -7,9 +7,11 @@ from fuse import FUSE
 from .operations import Filesystem
 from .inode_store import InodeStore
 from .cache import Cache
-from .worker import Worker
+from .balancer import Balancer
 from .b2_api import FileAPI
 from .ranker import Ranker
+from .deleter import Deleter
+from .cleaner import Cleaner
 from .rank_store import RankStore
 from .sqlite_queue import DB_NAME as QUEUE_DB_NAME
 
@@ -34,11 +36,11 @@ def main():
     # )
 
     deleter = multiprocessing.Process(
-        name="deleter", target=worker_delete_watcher, args=(args, config)
+        name="deleter", target=delete_watcher, args=(args, config)
     )
 
     cleaner = multiprocessing.Process(
-        name="cleaner", target=worker_clean_watcher, args=(args, config)
+        name="cleaner", target=clean_watcher, args=(args, config)
     )
 
     fuse.start()
@@ -61,11 +63,17 @@ def fuse_main(args, config):
         cache_folder=args.cache_folder, inode_store=inode_store, api=api
     )
     filesystem = Filesystem(cache)
-    FUSE(filesystem, args.mountpoint, nothreads=True, foreground=True)
+    FUSE(
+        filesystem,
+        args.mountpoint,
+        nothreads=True,
+        foreground=True,
+        big_writes=True,
+    )
 
 
-def worker_clean_watcher(args, config):
-    print("Starting worker main")
+def clean_watcher(args, config):
+    print("Starting cleaner")
 
     # TODO: Extract different worker roles into their own processes
 
@@ -79,26 +87,22 @@ def worker_clean_watcher(args, config):
     inode_store = InodeStore(config["sqliteFileLocation"])
     # rank_store = RankStore(config["sqliteFileLocation"])
     # ranker = Ranker(rank_store, inode_store)
-    cache = Cache(
+    cleaner = Cleaner(
         cache_folder=args.cache_folder, inode_store=inode_store, api=api
     )
-    worker = Worker(
-        cache=cache,
-        # ranker=ranker,
-        api=api,
-        target_disk_usage=config["targetDiskUsage"],
-    )
 
-    worker.run_clean_watcher()
+    cleaner.run_watcher()
 
 
 # TODO: subcribe Ranker to events
 # TODO: create loop to pull and handle events in Ranker
-# - or maybe this Ranker handling stuff should go into yet another process?
+# TODO: Ranker creates ranking, also sometimes scans the files in case he doens't correctly keep track of all events (folder moves)
+# TODO: Balancer balances files based on ranking by ranker
+# TODO: Balancer and ranker could also be one thing
 
 
-def worker_delete_watcher(args, config):
-    print("Starting delete watcher")
+def delete_watcher(args, config):
+    print("Starting deleter")
 
     api = FileAPI(
         account_id=config["accountId"],
@@ -107,20 +111,8 @@ def worker_delete_watcher(args, config):
         db_file=config["sqliteFileLocation"],
     )
 
-    inode_store = InodeStore(config["sqliteFileLocation"])
-    # rank_store = RankStore(config["sqliteFileLocation"])
-    # ranker = Ranker(rank_store, inode_store)
-    cache = Cache(
-        cache_folder=args.cache_folder, inode_store=inode_store, api=api
-    )
-    worker = Worker(
-        cache=cache,
-        # ranker=ranker,
-        api=api,
-        target_disk_usage=config["targetDiskUsage"],
-    )
-
-    worker.run_delete_watcher()
+    deleter = Deleter(api=api)
+    deleter.run_watcher()
 
 
 def reset_all():

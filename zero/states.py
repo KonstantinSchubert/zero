@@ -12,6 +12,12 @@ class StateMachine:
         self.dirty_flags = DirtyFlags(cache_folder)
         self.path_converter = PathConverter(cache_folder)
 
+    def dirty_or_clean_to_dirty(self, path):
+        if self.current_state_is_dirty(path):
+            return
+        else:
+            self.clean_to_dirty(path)
+
     def clean_to_dirty(self, path):
         if not self.current_state_is_clean(path):
             raise Exception("State should be clean but is not")

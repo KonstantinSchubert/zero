@@ -17,6 +17,7 @@ class PathLock:
         self,
         path,
         inode_store,
+        lock_creator=None,
         exclusive_lock_on_path=False,
         exclusive_lock_on_leaf=True,
         high_priority=False,
@@ -39,6 +40,7 @@ class PathLock:
                     exclusive=exclusive_lock_on_path,
                     acquisition_max_retries=acquisition_max_retries,
                     high_priority=high_priority,
+                    lock_creator=lock_creator,
                 )
             )
         # Lock for leaf
@@ -49,6 +51,7 @@ class PathLock:
                 exclusive=exclusive_lock_on_leaf,
                 acquisition_max_retries=acquisition_max_retries,
                 high_priority=high_priority,
+                lock_creator=lock_creator,
             )
         )
 
@@ -71,12 +74,18 @@ class PathLock:
 class NodeLock:
 
     def __init__(
-        self, inode, exclusive, acquisition_max_retries=0, high_priority=False
+        self,
+        inode,
+        exclusive,
+        lock_creator,
+        acquisition_max_retries=0,
+        high_priority=False,
     ):
         self.exclusive = exclusive
         self.acquisition_max_retries = acquisition_max_retries
         self.inode = inode
         self.high_priority = high_priority
+        self.lock_creator = lock_creator or "Unknown"
 
     def __enter__(self):
         # Lock database while setting lock
@@ -142,6 +151,7 @@ class NodeLock:
             os.remove(self._get_abort_request_file_name())
 
     def _request_abort(self):
+        print(f"{self.lock_creator} is requesting abort")
         if not os.path.exists(ABORT_REQUEST_DIR):
             os.mkdir(ABORT_REQUEST_DIR)
         open(self._get_abort_request_file_name(), "w").close()
