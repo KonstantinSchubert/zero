@@ -100,10 +100,6 @@ class Worker:
             self.remote_identifiers.set_uuid(path=path, uuid=new_uuid)
             self.state_store.set_clean(inode)
 
-    def _delete_inode(self, uuid):
-
-        self.api.delete(file_uuid)
-
     def clean(self):
         """Uplaod dirty files to remote"""
         for inode in self.state_store.get_dirty_inodes():
@@ -118,12 +114,12 @@ class Worker:
             while True:
                 time.sleep(1)
                 for message in deletion_listener.yield_events():
-                    print("GOT DELETION MESSAGE!!!!!!")
                     print(message)
+                    uuid = message["uuid"]
                     # TODO: the message must contain the uuid of the file to be deleted already,
                     # since the path may no longer exist.
                     if uuid is not None:
-                        self._delete_inode(uuid)
+                        self.api.delete(uuid)
 
     def evict(self, number_of_files):
         """Remove unneeded files from cache"""

@@ -30,4 +30,6 @@ class EventListener(message_queue.Listener):
     """
 
     def yield_events(self):
-        yield from self.yield_messages()
+        for message in self.yield_messages():
+            print("Yield message: ", message)
+            yield json.loads(message)

@@ -32,7 +32,6 @@ class _MessageTable:
         if result is None:
             raise NoNextMessage
         else:
-            print("GOT MESSAGE", result)
             return result
 
     def add_message(self, topic, message):
@@ -45,7 +44,7 @@ class _MessageTable:
     def delete_messages_older_than_id(self, message_id):
         with self.connection:
             self.connection.execute(
-                """DELETE from messsages WHERE id < ?""", (message_id,)
+                """DELETE from messages WHERE id < ?""", (message_id,)
             )
 
 
@@ -67,14 +66,12 @@ class _SubscriberTable:
                 (topic,),
             )
             subscriber_id = cursor.lastrowid
-            print("ADDED SUBSCRIBER")
             return subscriber_id
 
     def remove_subscriber(self, subscriber_id):
         self.connection.execute(
             """DELETE from subscribers WHERE id = ?""", (subscriber_id,)
         )
-        print("REMOVED SUBSCRIBER")
 
     def set_id_of_last_received_message(self, subscriber_id, message_id):
         with self.connection:
@@ -109,7 +106,6 @@ class _SubscriberTable:
 
 def publish_message(topic, message):
     _message_table = _MessageTable(DB_NAME)
-    print("ADDING MESSSAGE", topic, message)
     _message_table.add_message(topic=topic, message=message)
 
 
@@ -122,15 +118,15 @@ def get_next_message(subscriber_id):
     message_id, message = _message_table.get_next_message(
         id_of_last_received_message, topic
     )
-    _subscriber_table.set_id_of_last_received_message(message_id)
-    print("GOT MESSSAGE", message)
+    _subscriber_table.set_id_of_last_received_message(
+        subscriber_id=subscriber_id, message_id=message_id
+    )
     return message
 
 
 def purge_messages():
     _subscriber_table = _SubscriberTable(DB_NAME)
     _message_table = _MessageTable(DB_NAME)
-    print("PURGING")
     oldest_received_message_id = (
         _subscriber_table.get_id_of_oldest_received_message()
     )
@@ -164,6 +160,6 @@ class Listener:
         try:
             while True:
                 yield get_next_message(self.subscriber_id)
-                # purge_messages()  # This can of course be done more rarely
+                purge_messages()  # This can of course be done more rarely
         except NoNextMessage:
             pass

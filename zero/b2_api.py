@@ -43,9 +43,10 @@ class FileAPI:
             # by not finding a uuid: `if file_uuid is None:`...
             print(
                 f"Not deleting {file_uuid} because no file_id in file info store. "
-                f"Maybe had never been synched to remote"
+                f"This should not happen"
             )
             return
+        print("deleting file from remote")
         self.bucket_api.delete_file_version(file_id, str(file_uuid))
         self.file_info_store.remove_entry(file_uuid)
 
