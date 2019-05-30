@@ -21,11 +21,10 @@ def upload(api, file_to_upload, new_uuid):
 
 class Cleaner:
 
-    def __init__(self, cache_folder, inode_store, api):
+    def __init__(self, cache_folder, api):
         self.converter = PathConverter(cache_folder)
         self.api = api
         self.converter = self.converter
-        self.inode_store = inode_store
         self.states = StateMachine(cache_folder=cache_folder)
         self.remote_identifiers = RemoteIdentifiers(cache_folder)
         self.dirty_flags = DirtyFlags(cache_folder)
@@ -36,31 +35,36 @@ class Cleaner:
                 time.sleep(1)
                 for message in cleaning_listener.yield_events():
 
-                    # It is impotant to take it easy here - often, after receiving a message,
-                    # the file is still being written. There is no point starting to upload
-                    # immediately
-                    time.sleep(1)
-                    # Of course, in the long run we have to think of smarter ways to do de-duplication here.
-
                     path = message["path"]
                     print("Received message to clean " + path)
                     if not self.states.current_state_is_dirty(path):
                         print(
-                            "No dirty flag found on path, aborting. This can happen"
+                            "No dirty flag found on path. Probably already uploaded"
                         )
                         continue
+                    # It is impotant to take it easy here - often, after receiving a message,
+                    # the file is still being written. There is no point starting to upload
+                    # immediately
+                    # By having this sleep AFTER the first dirty check, we can speed through messages that
+                    # tell us a file is dirty that isn't actually dirty.
+                    # By having this sleep BEFORE the path lock, we give fuse a chance to finish writing the file
+                    # before we are attempting an upload.
+                    time.sleep(1)
+                    # In the long run we may have to think of smarter ways to handle duplicate messages here.
+                    # We might want to keep an internal de-duplciated backlog of file that we still have to clean,
+                    # and then have one worker to fill the backlog and (eliminating duplicates) and another
+                    # worker working off it
                     with PathLock(
                         path,
-                        self.inode_store,
                         acquisition_max_retries=10,
-                        exclusive_lock_on_leaf=True,
+                        exclusive_lock_on_leaf=False,
                         high_priority=False,
                         lock_creator="Cleaner",
                     ) as lock:
                         # - check if file exists and is still dirty
                         if not self.states.current_state_is_dirty(path):
                             print(
-                                "No dirty flag found on path, aborting. This can happen"
+                                "No dirty flag found on path. Some other thread cleaned it within the last second."
                             )
                             continue
 

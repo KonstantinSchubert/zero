@@ -11,12 +11,20 @@ from .globals import ANTI_COLLISION_HASH
 from .states import StateMachine
 
 
+def is_file_descriptor(cache_path):
+    try:
+        os.stat(cache_path)
+    except OSError:
+        return False
+    else:
+        return True
+
+
 class Cache:
 
-    def __init__(self, cache_folder, inode_store, api):
+    def __init__(self, cache_folder, api):
         self.cache_folder = cache_folder
         self.converter = PathConverter(cache_folder)
-        self.inode_store = inode_store
         self.api = api
         self.metadata_store = MetaData(cache_folder)
         self.states = StateMachine(cache_folder=cache_folder)
@@ -63,7 +71,6 @@ class Cache:
         print(f"CACHE: open {path}")
         with PathLock(
             path,
-            self.inode_store,
             high_priority=True,
             acquisition_max_retries=100,
             lock_creator="CACHE OPEN",
@@ -76,7 +83,6 @@ class Cache:
         print(f"CACHE: read {path}")
         with PathLock(
             path,
-            self.inode_store,
             exclusive_lock_on_leaf=False,
             high_priority=True,
             acquisition_max_retries=100,
@@ -89,12 +95,7 @@ class Cache:
 
     def truncate(self, path, length):
         print("truncate")
-        with PathLock(
-            path,
-            self.inode_store,
-            high_priority=True,
-            acquisition_max_retries=100,
-        ):
+        with PathLock(path, high_priority=True, acquisition_max_retries=100):
             self.metadata_store.record_content_modification(path=path)
             cache_path = self.converter.to_cache_path(path)
             FileUpdateOrCreateEvent.submit(path=path)
@@ -106,7 +107,6 @@ class Cache:
         print("write")
         with PathLock(
             path,
-            self.inode_store,
             high_priority=True,
             acquisition_max_retries=100,
             lock_creator="CACHE WRITE",
@@ -126,7 +126,6 @@ class Cache:
         result = os.open(
             cache_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode
         )
-        self.inode_store.create_path(path)
         self.metadata_store.record_content_modification(path=path)
         self.states.clean_to_dirty(path)
         FileUpdateOrCreateEvent.submit(path=path)
@@ -135,50 +134,45 @@ class Cache:
 
     def rename(self, old_path, new_path):
         print("rename")
-        # TODO: This function has a bunch of
-        # race conditions, especially
-        # if we assume multiple fuse threads
-
-        # We need a way to call PathLock that
-        # creates a new path in the inode_store and also locks it in a race-
-        # free manner.  We need this in multiple parts of the code,
-        # also here.
-        # TODO: I also need to update the ctime of the affected files
+        # TODO: Examine this function for race conditions
+        # TODO: Check if I need to update the ctime of the affected files
 
         # TODO: Issue event to inform ranker about move?
         old_cache_path = self.converter.to_cache_path(old_path)
         new_cache_path = self.converter.to_cache_path(new_path)
         with PathLock(
             old_path,
-            self.inode_store,
             acquisition_max_retries=100,
             high_priority=True,
             lock_creator="CACHE RENAME",
         ):
-            existing_inode_at_new_location = self.inode_store.get_inode(
-                new_path
+            existing_file_desciptor_at_new_location = is_file_descriptor(
+                new_cache_path
             )
-            if existing_inode_at_new_location:
+            if existing_file_desciptor_at_new_location:
                 # If something exists at the target path, we will overwrite it
-                if os.path.isdir(new_cache_path):
-                    # inode is a folder:
-                    self.rmdir(new_path)
-                    # TODO: What if the target file contains files? Don't we have to delete them?
-                else:
-                    # inode is a file
+                if os.path.islink(new_cache_path):
+                    os.unlink(new_cache_path)
+                elif os.path.isdir(new_cache_path):
+                    # file_desciptor is a folder:
+                    self.rmdir(new_cache_path)
+                    # TODO: If the target contains files, we have to delete them and issue
+                    # delete events!
+                elif os.path.isdir(new_cache_path):
+                    # file_desciptor is a file
                     with PathLock(
                         new_path,
-                        self.inode_store,
                         acquisition_max_retries=100,
                         high_priority=True,
                     ):
                         self._delete_file(new_path)
+                else:
+                    raise NotImplementedError
 
             if os.path.isdir(old_cache_path):
                 # Rename the cache files
                 os.rename(old_cache_path, new_cache_path)
-                # Update the inode store
-                self.inode_store.rename_paths(old_path, new_path)
+                # TODO: Issue event for ranker.
             else:
                 # Rename the cache files
                 os.rename(old_cache_path, new_cache_path)
@@ -196,9 +190,7 @@ class Cache:
                         self.cache_folder
                     )._dirty_flag_path_from_fuse_path(new_path),
                 )
-                # self.metadata_store. -> record file move
-                # Update the inode store
-                self.inode_store.rename_paths(old_path, new_path)
+                # TODO: self.metadata_store. -> record file move
 
     def mkdir(self, path, mode):
         print("mkdir", path)
@@ -206,7 +198,6 @@ class Cache:
         # creates a new path and also locks it in a race-
         # free manner.  We need this in multiple parts of the code
         # also here.
-        self.inode_store.create_path(path)
         cache_path = self.converter.to_cache_path(path)
         return os.mkdir(cache_path, mode)
 
@@ -215,12 +206,11 @@ class Cache:
         print("rmdir", args, kwargs)
         with PathLock(
             fuse_path,
-            self.inode_store,
             high_priority=True,
             acquisition_max_retries=100,
             lock_creator="CACHE RMDIR",
         ):
-            self.inode_store.delete_path(fuse_path)
+            # TODO: I assume this fails, and fuse expects it to fail, if the folder is not empty?
             return os.rmdir(cache_path, *args, **kwargs)
 
     def unlink(self, fuse_path):
@@ -233,7 +223,6 @@ class Cache:
 
             with PathLock(
                 fuse_path,
-                self.inode_store,
                 acquisition_max_retries=10,
                 high_priority=True,
                 lock_creator="CACHE UNLINK",
@@ -242,7 +231,6 @@ class Cache:
 
     def _delete_file(self, fuse_path):
         try:
-            self.inode_store.delete_path(fuse_path)
             os.unlink(self._get_path_or_dummy(fuse_path))
 
             # Delete all flags. This is hacky and should be cleaned up
@@ -297,9 +285,8 @@ class Cache:
     def is_link(cache_path):
         return os.path.islink(cache_path)
 
-    def replace_dummy(self, inode):
-        path = self.inode_store.get_paths(inode)[0]
-        with PathLock(path, self.inode_store):
+    def replace_dummy(self, path):
+        with PathLock(path, lock_creator="replace_dummy"):
             self._replace_dummy(path)
 
     def _replace_dummy(self, path):
@@ -318,14 +305,11 @@ class Cache:
                 raise FuseOSError(errno.ENETUNREACH)
         self.states.remote_to_clean(path)
 
-    def create_dummy(self, inode):
-        path = self.inode_store.get_paths(inode)[0]
-        with PathLock(path, self.inode_store):
+    def create_dummy(self, path):
+        with PathLock(path, lock_creator="create_dummy"):
             # This can happen if the file was written to in the meantime
             if not self.states.current_state_is_clean(path):
-                print(
-                    "Cannot create dummy for inode because inode is not clean"
-                )
+                print("Cannot create dummy for file because file is not clean")
                 return
             self.states.clean_to_remote(path)
 

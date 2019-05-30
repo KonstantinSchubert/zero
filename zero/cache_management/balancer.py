@@ -2,11 +2,11 @@ import logging
 import time
 import subprocess
 from multiprocessing import Process
-from .locking import NodeLockedException, PathLock
-from .remote_identifiers import RemoteIdentifiers
-from .events import EventListener, FileDeleteEvent, FileUpdateOrCreateEvent
-from .dirty_flags import DirtyFlags
-from .states import StateMachine
+from zero.locking import NodeLockedException, PathLock
+from zero.remote_identifiers import RemoteIdentifiers
+from zero.events import EventListener, FileDeleteEvent, FileUpdateOrCreateEvent
+from zero.dirty_flags import DirtyFlags
+from zero.states import StateMachine
 
 logger = logging.getLogger("spam_application")
 

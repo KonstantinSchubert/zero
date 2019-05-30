@@ -5,14 +5,13 @@ from fuse import FUSE
 
 
 from .operations import Filesystem
-from .inode_store import InodeStore
 from .cache import Cache
-from .balancer import Balancer
+from .cache_management.balancer import Balancer
+from .cache_management.ranker import Ranker
+from .cache_management.rank_store import RankStore
 from .b2_api import FileAPI
-from .ranker import Ranker
 from .deleter import Deleter
 from .cleaner import Cleaner
-from .rank_store import RankStore
 from .sqlite_queue import DB_NAME as QUEUE_DB_NAME
 
 import multiprocessing
@@ -58,10 +57,7 @@ def fuse_main(args, config):
         bucket_id=config["bucketId"],
         db_file=config["sqliteFileLocation"],
     )
-    inode_store = InodeStore(config["sqliteFileLocation"])
-    cache = Cache(
-        cache_folder=args.cache_folder, inode_store=inode_store, api=api
-    )
+    cache = Cache(cache_folder=args.cache_folder, api=api)
     filesystem = Filesystem(cache)
     FUSE(
         filesystem,
@@ -84,12 +80,9 @@ def clean_watcher(args, config):
         db_file=config["sqliteFileLocation"],
     )
 
-    inode_store = InodeStore(config["sqliteFileLocation"])
     # rank_store = RankStore(config["sqliteFileLocation"])
     # ranker = Ranker(rank_store, inode_store)
-    cleaner = Cleaner(
-        cache_folder=args.cache_folder, inode_store=inode_store, api=api
-    )
+    cleaner = Cleaner(cache_folder=args.cache_folder, api=api)
 
     cleaner.run_watcher()
 
