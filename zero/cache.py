@@ -2,7 +2,13 @@ import os
 import errno
 from fuse import FuseOSError
 from .locking import PathLock
-from .events import FileAccessEvent, FileDeleteEvent, FileUpdateOrCreateEvent
+from .events import (
+    FileAccessEvent,
+    FileDeleteEvent,
+    FileUpdateOrCreateEvent,
+    FileEvictedFromCacheEvent,
+    FileLoadedIntoCacheEvent,
+)
 from .metadata_store import MetaData, _metadata_cache_path_from_cache_path
 from .path_converter import PathConverter
 from .remote_identifiers import RemoteIdentifiers
@@ -288,6 +294,7 @@ class Cache:
     def replace_dummy(self, path):
         with PathLock(path, lock_creator="replace_dummy"):
             self._replace_dummy(path)
+            FileLoadedIntoCacheEvent.submit()
 
     def _replace_dummy(self, path):
         print(f"Replacing dummy [path]")
@@ -312,6 +319,7 @@ class Cache:
                 print("Cannot create dummy for file because file is not clean")
                 return
             self.states.clean_to_remote(path)
+            FileEvictedFromCacheEvent.submit()
 
     def statfs(self, path):
         cache_path = self._get_path_or_dummy(path)

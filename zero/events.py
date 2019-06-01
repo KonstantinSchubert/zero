@@ -29,6 +29,32 @@ class FileDeleteEvent(Event):
     arguments = ["path", "uuid"]
 
 
+class FileRenameOrMoveEvent(Event):
+    topic = "FILE_WAS_RENAMED_OR_MOVED"
+    arguments = ["old_path", "new_path"]
+    # TODO: Make sure to submit this even where needed
+
+
+class FolderRenameOrMoveEvent(Event):
+    topic = "FOLDER_WAS_RENAMED_OR_MOVED"
+    arguments = ["old_path", "new_path"]
+    # TODO: Make sure to submit this even where needed
+
+
+class FileEvictedFromCacheEvent(Event):
+    topic = "FILE_WAS_EVICTED_FROM_CACHE"
+    arguments = ["path"]
+    # TODO: Make sure to submit this even where needed
+
+
+class FileLoadedIntoCacheEvent(Event):
+    topic = "FILE_WAS_LOADED_INTO_THE_CACHE"
+    arguments = ["path"]
+    # TODO: Make sure to submit this even where needed
+    # THe current plan is that this event is only fired when a dummy
+    # is replaced, not when the file is initially created.
+
+
 class EventListener(message_queue.Listener):
     """
     Use this context manager to listen to events on the queue

@@ -59,8 +59,12 @@ class Balancer:
         # and look at files with low rank who are CLEAN
         evictees = self.ranker.get_eviction_candidates(number_of_files)
         print(evictees)
-        for inode in evictees:
-            self.cache.create_dummy(inode)
+        for path in evictees:
+            self.cache.create_dummy(path)
+
+        # TODO: Handle race conditions and mistakes by the ranker that
+        # cause create_dummy to fail.
+        # For example the ranker might have returned a path that does no longer exit.
 
     def prime(self, number_of_files):
         """Fill the cache with files from remote
@@ -70,8 +74,12 @@ class Balancer:
         # join state table with rank table and look at files with high
         # rank who are REMOTE
         primees = self.ranker.get_priming_candidates(number_of_files)
-        for inode in primees:
-            self.cache.replace_dummy(inode)
+        for path in primees:
+            self.cache.replace_dummy(path)
+
+            # TODO: Handle race conditions and mistakes by the ranker that
+            # cause replace_dummy to fail.
+            # For example the ranker might have returned a path that does no longer exit.
 
     def order_cache(self):
         # TODO: Make sure that biggest file < 0.1 * target_disk_usage, else this won't work.
