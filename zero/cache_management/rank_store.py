@@ -38,7 +38,7 @@ class RankStore:
                 """UPDATE ranks SET rank = rank * ?""", (factor,)
             )
 
-    def record_cache_eviction(self, path):
+    def mark_as_remote(self, path):
         with self.connection:
             # This inserts a new row in case the path does not yet exist
             self.connection.execute(
@@ -46,7 +46,7 @@ class RankStore:
                 (path, FILE_LOCATION.REMOTE),
             )
 
-    def record_cache_insertion(self, path):
+    def mark_as_local(self, path):
         with self.connection:
             # This inserts a new row in case the path does not yet exist
             self.connection.execute(
@@ -57,31 +57,31 @@ class RankStore:
     def get_clean_and_low_rank_paths(self, limit):
         with self.connection:
             cursor = self.connection.execute(
-                f"""SELECT path FROM ranks WHERE file_location = {FILE_LOCATION.LOCAL} ORDER BY rank ASC LIMIT ? """,
+                f"""SELECT path FROM ranks WHERE file_location = '{FILE_LOCATION.LOCAL}' ORDER BY rank ASC LIMIT ? """,
                 (limit,),
             )
             results = cursor.fetchall()
-        return [int(result[0]) for result in results]
+        return [result[0] for result in results]
 
     def get_remote_and_high_rank_paths(self, limit):
         with self.connection:
             cursor = self.connection.execute(
-                f"""SELECT path FROM ranks WHERE file_location = {FILE_LOCATION.REMOTE} ORDER BY rank DESC LIMIT ? """,
+                f"""SELECT path FROM ranks WHERE file_location = '{FILE_LOCATION.REMOTE}' ORDER BY rank DESC LIMIT ? """,
                 (limit,),
             )
             results = cursor.fetchall()
-        return [int(result[0]) for result in results]
+        return [result[0] for result in results]
 
     def ranks_are_sorted(self):
         with self.connection:
             cursor = self.connection.execute(
-                f"""SELECT rank FROM ranks WHERE file_location = {FILE_LOCATION.REMOTE} ORDER BY rank DESC LIMIT 1 """
+                f"""SELECT rank FROM ranks WHERE file_location = '{FILE_LOCATION.REMOTE}' ORDER BY rank DESC LIMIT 1 """
             )
             results = cursor.fetchone()
             highest_remote_rank = results and results[0]
 
             cursor = self.connection.execute(
-                f"""SELECT rank FROM ranks WHERE file_location = {FILE_LOCATION.LOCAL} ORDER BY ranks.rank ASC LIMIT 1 """
+                f"""SELECT rank FROM ranks WHERE file_location = '{FILE_LOCATION.LOCAL}' ORDER BY rank ASC LIMIT 1 """
             )
             results = cursor.fetchone()
             lowest_cache_rank = results and results[0]

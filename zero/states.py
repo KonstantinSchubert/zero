@@ -4,6 +4,10 @@ from .remote_identifiers import RemoteIdentifiers
 from .path_converter import PathConverter
 
 
+class WrongInitialStateException(Exception):
+    pass
+
+
 class StateMachine:
     """ This class is NOT thread safe. We assume that the path has write-locked (or is a read lock enough?)"""
 
@@ -20,18 +24,17 @@ class StateMachine:
 
     def clean_to_dirty(self, path):
         if not self.current_state_is_clean(path):
-            raise Exception("State should be clean but is not")
+            raise WrongInitialStateException("State should be clean but is not")
         self.dirty_flags.set_dirty_flag(path=path)
 
     def dirty_to_clean(self, path):
         if not self.current_state_is_dirty(path):
-            raise Exception("State should be dirty but is not")
+            raise WrongInitialStateException("State should be dirty but is not")
         self.dirty_flags.remove_dirty_flag(path=path)
 
     def clean_to_remote(self, path):
         if not self.current_state_is_clean(path):
-            raise Exception("State should be clean but is not")
-
+            raise WrongInitialStateException("State should be clean but is not")
         cache_path = self.path_converter.to_cache_path(path)
         cache_dummy_path = self.path_converter.add_dummy_ending(cache_path)
         # Re-name to preserve file permissions, user id.
@@ -39,7 +42,9 @@ class StateMachine:
 
     def remote_to_clean(self, path):
         if not self.current_state_is_remote(path):
-            raise Exception("State should be remote but is not")
+            raise WrongInitialStateException(
+                "State should be remote but is not"
+            )
         cache_path = self.path_converter.to_cache_path(path)
         cache_dummy_path = self.path_converter.add_dummy_ending(cache_path)
         # Re-name to preserve file permissions, user id.

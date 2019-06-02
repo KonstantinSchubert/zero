@@ -2,26 +2,30 @@ import logging
 import subprocess
 from zero.remote_identifiers import RemoteIdentifiers
 from zero.dirty_flags import DirtyFlags
-from zero.states import StateMachine
+from zero.cache import PathDoesNotExistException
+from zero.states import WrongInitialStateException
+from .ranker import Ranker
+from .rank_store import RankStore
+import time
 
 logger = logging.getLogger("spam_application")
 
 
 class Balancer:
 
-    def __init__(self, cache, api, target_disk_usage):
+    def __init__(self, cache, api, target_disk_usage, db_file):
         self.api = api
         self.target_disk_usage = target_disk_usage
         # Todo: Write methods in the cache class which wrap the
         # objects from the following two objects that I am using here
         self.converter = cache.converter
-        self.inode_store = cache.inode_store
         # self.ranker = ranker
         self.cache = cache
         cache_folder = self.converter.cache_folder  # Fix this hack
-        self.states = StateMachine(cache_folder=cache_folder)
         self.remote_identifiers = RemoteIdentifiers(cache_folder)
         self.dirty_flags = DirtyFlags(cache_folder)
+        self.ranker = Ranker(db_file, cache_folder=cache_folder)
+        self.read_only_rank_store = RankStore(db_path=db_file)
 
     def get_size_of_biggest_file(self):
         """In GB"""
@@ -49,41 +53,33 @@ class Balancer:
         return float(du_output) / (1000 * 1000)
 
     def get_eviction_candidates(self, limit):
-        return self.rank_store.get_clean_and_low_rank_inodes(limit)
-        # TODO: Check if eviction candidates actually exist in file system
+        # To decide which files to evict, look at files with low rank who are CLEAN
+        return self.read_only_rank_store.get_clean_and_low_rank_paths(limit)
 
     def get_priming_candidates(self, limit):
-        return self.rank_store.get_remote_and_high_rank_inodes(limit)
-        # TODO: Check if priming candidates actually exist in file system
+        # To decide which files to prime with, look at files with high rank who are REMOTE
+        return self.read_only_rank_store.get_remote_and_high_rank_paths(limit)
 
     def evict(self, number_of_files):
         """Remove unneeded files from cache"""
-        # To decide which files to evict,
-        # join state table with rank table
-        # and look at files with low rank who are CLEAN
-        evictees = self.ranker.get_eviction_candidates(number_of_files)
+        evictees = self.get_eviction_candidates(number_of_files)
         print(evictees)
         for path in evictees:
-            self.cache.create_dummy(path)
-
-        # TODO: Handle race conditions and mistakes by the ranker that
-        # cause create_dummy to fail.
-        # For example the ranker might have returned a path that does no longer exit.
+            try:
+                self.cache.create_dummy(path)
+            except (PathDoesNotExistException, WrongInitialStateException):
+                self.ranker.re_index(path)
 
     def prime(self, number_of_files):
         """Fill the cache with files from remote
         that are predicted to be needed.
         """
-        # To decide which files to prime with,
-        # join state table with rank table and look at files with high
-        # rank who are REMOTE
-        primees = self.ranker.get_priming_candidates(number_of_files)
+        primees = self.get_priming_candidates(number_of_files)
         for path in primees:
-            self.cache.replace_dummy(path)
-
-            # TODO: Handle race conditions and mistakes by the ranker that
-            # cause replace_dummy to fail.
-            # For example the ranker might have returned a path that does no longer exit.
+            try:
+                self.cache.replace_dummy(path)
+            except (PathDoesNotExistException, WrongInitialStateException):
+                self.ranker.re_index(path)
 
     def order_cache(self):
         # TODO: Make sure that biggest file < 0.1 * target_disk_usage, else this won't work.
@@ -111,3 +107,8 @@ class Balancer:
         else:
             print("Priming")
             self.prime(1)
+
+    def run(self):
+        while True:
+            time.sleep(1)
+            self.order_cache()

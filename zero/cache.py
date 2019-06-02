@@ -17,6 +17,10 @@ from .globals import ANTI_COLLISION_HASH
 from .states import StateMachine
 
 
+class PathDoesNotExistException(Exception):
+    pass
+
+
 def is_file_descriptor(cache_path):
     try:
         os.stat(cache_path)
@@ -315,9 +319,10 @@ class Cache:
     def create_dummy(self, path):
         with PathLock(path, lock_creator="create_dummy"):
             # This can happen if the file was written to in the meantime
-            if not self.states.current_state_is_clean(path):
-                print("Cannot create dummy for file because file is not clean")
-                return
+            if not os.path.isfile(self.converter.to_cache_path(path)):
+                raise PathDoesNotExistException(
+                    f"Cannot creat dummy because {path} not found"
+                )
             self.states.clean_to_remote(path)
             FileEvictedFromCacheEvent.submit()
 

@@ -8,6 +8,11 @@ class Event:
 
     @classmethod
     def submit(cls, **kwargs):
+        if set(kwargs.keys()) != set(cls.arguments):
+            # When I translate this code to a statically-typed language, this check should happen at compile time.
+            raise Exception(
+                "Submit method of {topic} events is expecting the following arguments: {arguments}"
+            )
         kwargs = {
             key: value for key, value in kwargs.items() if key in cls.arguments
         }

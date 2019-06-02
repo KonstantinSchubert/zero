@@ -56,36 +56,46 @@ class Cleaner:
                     # We might want to keep an internal de-duplciated backlog of file that we still have to clean,
                     # and then have one worker to fill the backlog and (eliminating duplicates) and another
                     # worker working off it
-                    with PathLock(
-                        path,
-                        acquisition_max_retries=10,
-                        exclusive_lock_on_leaf=False,
-                        high_priority=False,
-                        lock_creator="Cleaner",
-                    ) as lock:
-                        # - check if file exists and is still dirty
-                        if not self.states.current_state_is_dirty(path):
-                            print(
-                                "No dirty flag found on path. Some other thread cleaned it within the last second."
-                            )
-                            continue
+                    try:
+                        with PathLock(
+                            path,
+                            exclusive_lock_on_leaf=False,
+                            high_priority=False,
+                            lock_creator="Cleaner",
+                        ) as lock:
+                            # - check if file exists and is still dirty
+                            if not self.states.current_state_is_dirty(path):
+                                print(
+                                    "No dirty flag found on path. Some other thread cleaned it within the last second."
+                                )
+                                continue
 
-                        # - get old uuid if it exists
-                        old_uuid = self.remote_identifiers.get_uuid_or_none(
-                            path
+                            # - get old uuid if it exists
+                            old_uuid = self.remote_identifiers.get_uuid_or_none(
+                                path
+                            )
+                            if old_uuid:
+                                # - If yes, delete old version of file on remote
+                                self.api.delete(old_uuid)
+
+                            try:
+                                new_uuid = self.upload_file(
+                                    path=path, lock=lock
+                                )
+                                self.states.dirty_to_clean(path)
+                                self.remote_identifiers.set_uuid(
+                                    path=path, uuid=new_uuid
+                                )
+                            except UploadAbortException:
+                                print(f"upload of {path} was ABORTED")
+                    except NodeLockedException:
+                        # Let's postpone this for a bit
+                        # TODO: This aproach for setting ourselves a reminder is hacky beause it may confuse
+                        # other event listeners. Find a better way
+                        print(
+                            "Could not obtain lock on path for cleaning. This can happen"
                         )
-                        if old_uuid:
-                            # - If yes, delete old version of file on remote
-                            self.api.delete(old_uuid)
-
-                        try:
-                            new_uuid = self.upload_file(path=path, lock=lock)
-                            self.states.dirty_to_clean(path)
-                            self.remote_identifiers.set_uuid(
-                                path=path, uuid=new_uuid
-                            )
-                        except UploadAbortException:
-                            print(f"upload of {path} was ABORTED")
+                        FileUpdateOrCreateEvent.submit(path=path)
 
     def upload_file(self, path, lock):
         new_uuid = RemoteIdentifiers.generate_uuid()

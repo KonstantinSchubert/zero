@@ -38,9 +38,9 @@ def main():
     #     name="ranker_scanner", target=ranker_scanner, args=(args, config)
     # )
 
-    # balancer = multiprocessing.Process(
-    #     name="ranker_watcher", target=balancer, args=(args, config)
-    # )
+    balancer = multiprocessing.Process(
+        name="ranker_watcher", target=run_balancer, args=(args, config)
+    )
 
     deleter = multiprocessing.Process(
         name="deleter", target=delete_watcher, args=(args, config)
@@ -55,7 +55,7 @@ def main():
     cleaner.start()
     ranker_watcher.start()
     # ranker_scanner.start()
-    # balancer.start()
+    balancer.start()
 
 
 def fuse_main(args, config):
@@ -108,13 +108,37 @@ def delete_watcher(args, config):
 
 def ranker_events_watcher(args, config):
     print("Starting ranker (event watcher)")
-    ranker = Ranker(db_file=config["sqliteFileLocation"])
+    ranker = Ranker(
+        db_file=config["sqliteFileLocation"], cache_folder=args.cache_folder
+    )
     ranker.watch_events()
 
 
 def ranker_scanner(args, config):
-    ranker = Ranker(db_file=config["sqliteFileLocation"])
-    ranker.scan_file_system()
+    print("Starting ranker (scanner)")
+    ranker = Ranker(
+        db_file=config["sqliteFileLocation"], cache_folder=args.cache_folder
+    )
+    ranker.scan()
+
+
+def run_balancer(args, config):
+    print("Starting balancer")
+
+    api = FileAPI(
+        account_id=config["accountId"],
+        application_key=config["applicationKey"],
+        bucket_id=config["bucketId"],
+        db_file=config["sqliteFileLocation"],
+    )
+    cache = Cache(cache_folder=args.cache_folder, api=api)
+    balancer = Balancer(
+        cache=cache,
+        api=api,
+        target_disk_usage=TARGET_DISK_USAGE,
+        db_file=config["sqliteFileLocation"],
+    )
+    balancer.run()
 
 
 def reset_all():

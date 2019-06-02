@@ -1,6 +1,7 @@
 import time
-from .rank_store import RankStore
+import os
 
+from zero.states import StateMachine
 from zero.events import (
     EventListener,
     FileAccessEvent,
@@ -11,6 +12,8 @@ from zero.events import (
     FileEvictedFromCacheEvent,
     FileLoadedIntoCacheEvent,
 )
+
+from .rank_store import RankStore
 
 
 class Ranker:
@@ -28,9 +31,10 @@ class Ranker:
     Again, our tracking precision is only approximately correct.
     """
 
-    def __init__(self, db_file):
+    def __init__(self, db_file, cache_folder):
         self.rank_store = RankStore(db_path=db_file)
         self.access_times = {}
+        self.states_read_only = StateMachine(cache_folder=cache_folder)
 
     def handle_file_access(self, path):
         """Update ranking in reaction to the access event"""
@@ -44,10 +48,10 @@ class Ranker:
         self.rank_store.remove_or_ignore(path)
 
     def handle_cache_insertion(self, path):
-        self.rank_store.record_cache_insertion(path)
+        self.rank_store.mark_as_local(path)
 
     def handle_cache_eviction(self, path):
-        self.rank_store.record_cache_eviction(path)
+        self.rank_store.mark_as_remote(path)
 
     def is_sufficiently_sorted(self):
         """Return true the files in cache are the highest ranking files.
@@ -56,6 +60,17 @@ class Ranker:
         """
         # For now, check for the "hard" condition: Completely sorted
         return self.rank_store.ranks_are_sorted()
+
+    def re_index(self, path):
+        if not os.path.isfile(path):
+            self.rank_store.remove_or_ignore(path)
+            return
+        # TODO: Try-Catch the case that file is concurrently removed after the above check.
+        # In this case, we just do nothing. Re-index doesn't need to be 100% reliable.
+        if self.states.current_state_is_remote(path):
+            self.rank_store.mark_as_remote(path)
+        else:
+            self.rank_store.mark_as_local(path)
 
     def watch_events(self):
         # We use a single event listener in order to preserve the sequence of messages (avoid sharding).
@@ -96,12 +111,12 @@ class Ranker:
                     else:
                         raise Exception("Unexpected event")
 
-    def scan_file_system(self):
+    def scan(self):
         # TODO: Because the message system is not determinisistc, we need to sporadically
         # scan the file system to
         # Insert paths into rank_store that are missing
-        # Remove paths from rank_store that do actually no longer exist
-        # Correct the FILE_LOCATION (Local vs remote) of a path
+        # Remove paths from rank_store that do actually no longer exist (for this I need to iterate over the table!)
+        # Correct the FILE_LOCATION (Local vs remote) of a path -> call re_index(path) for all discovered paths
         pass
 
     # The next two functions should be refactored into their own class
