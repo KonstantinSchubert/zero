@@ -55,12 +55,10 @@ class FileLoadedIntoCacheEvent(Event):
     # is replaced, not when the file is initially created.
 
 
-class EventListener(message_queue.Listener):
+class EventListener(message_queue.Subscriber):
     """
     Use this context manager to listen to events on the queue
     """
 
     def yield_events(self):
-        for message in self.yield_messages():
-            print("Yield message: ", message)
-            yield json.loads(message)
+        yield from self.yield_messages()

@@ -1,5 +1,16 @@
 import time
-from rank_store import RankStore
+from .rank_store import RankStore
+
+from zero.events import (
+    EventListener,
+    FileAccessEvent,
+    FileUpdateOrCreateEvent,
+    FileDeleteEvent,
+    FileRenameOrMoveEvent,
+    FolderRenameOrMoveEvent,
+    FileEvictedFromCacheEvent,
+    FileLoadedIntoCacheEvent,
+)
 
 
 class Ranker:
@@ -17,9 +28,8 @@ class Ranker:
     Again, our tracking precision is only approximately correct.
     """
 
-    def __init__(self, rank_store, inode_store):
-        self.rank_store = rank_store
-        self.inode_store = inode_store
+    def __init__(self, db_file):
+        self.rank_store = RankStore(db_path=db_file)
         self.access_times = {}
 
     def handle_file_access(self, path):
@@ -33,13 +43,11 @@ class Ranker:
         """Update ranking in reaction to a file being deleted"""
         self.rank_store.remove_or_ignore(path)
 
-    def get_eviction_candidates(self, limit):
-        return self.rank_store.get_clean_and_low_rank_inodes(limit)
-        # TODO: Check if eviction candidates actually exist in file system
+    def handle_cache_insertion(self, path):
+        self.rank_store.record_cache_insertion(path)
 
-    def get_priming_candidates(self, limit):
-        return self.rank_store.get_remote_and_high_rank_inodes(limit)
-        # TODO: Check if priming candidates actually exist in file system
+    def handle_cache_eviction(self, path):
+        self.rank_store.record_cache_eviction(path)
 
     def is_sufficiently_sorted(self):
         """Return true the files in cache are the highest ranking files.
@@ -49,31 +57,44 @@ class Ranker:
         # For now, check for the "hard" condition: Completely sorted
         return self.rank_store.ranks_are_sorted()
 
-    # The next couple of functions should maybe be running concurrently
-
-    def watch_access_events(self):
-        # TODO: Implement this, call handle_file_access
-        pass
-
-    def watch_delete_events(self):
-        # TODO: Implement this, call handle_file_delete
-        pass
-
-    def watch_file_rename_or_move_events(self):
-        # TODO: Implement this in second iteration
-        pass
-
-    def watch_folder_rename_or_move_events(self):
-        # TODO: Implement this in second iteration
-        pass
-
-    def watch_cache_evictions(self):
-        # TODO: Implement this, call rank_store.record_cache_eviction
-        pass
-
-    def watch_cache_insertions(self):
-        # TODO: Implement this, call rank_store.record_cache_insertion
-        pass
+    def watch_events(self):
+        # We use a single event listener in order to preserve the sequence of messages (avoid sharding).
+        # This should improve our chances of keeping track of file and folder moves/renames before correctly.
+        with EventListener(
+            (
+                FileUpdateOrCreateEvent.topic,
+                FileAccessEvent.topic,
+                FileDeleteEvent.topic,
+                FileEvictedFromCacheEvent.topic,
+                FileLoadedIntoCacheEvent.topic,
+                FileRenameOrMoveEvent.topic,
+                FolderRenameOrMoveEvent.topic,
+            )
+        ) as multi_topic_listener:
+            while True:
+                time.sleep(0.1)
+                for message in multi_topic_listener.yield_events():
+                    print(message)
+                    message_topic = message["topic"]
+                    if message_topic in (
+                        FileUpdateOrCreateEvent.topic,
+                        FileAccessEvent.topic,
+                    ):
+                        self.handle_file_access(message["path"])
+                    elif message_topic == FileDeleteEvent.topic:
+                        self.handle_file_delete(message["path"])
+                    elif message_topic == FileEvictedFromCacheEvent.topic:
+                        self.handle_cache_eviction(message["path"])
+                    elif message_topic == FileLoadedIntoCacheEvent.topic:
+                        self.handle_cache_insertion(message["path"])
+                    elif message_topic == FileRenameOrMoveEvent.topic:
+                        # TODO: rename path in the rank store
+                        pass
+                    elif message_topic == FolderRenameOrMoveEvent.topic:
+                        # TODO: rename all affected paths in the rank store
+                        pass
+                    else:
+                        raise Exception("Unexpected event")
 
     def scan_file_system(self):
         # TODO: Because the message system is not determinisistc, we need to sporadically

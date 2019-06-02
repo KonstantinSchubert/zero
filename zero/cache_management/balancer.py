@@ -1,10 +1,6 @@
 import logging
-import time
 import subprocess
-from multiprocessing import Process
-from zero.locking import NodeLockedException, PathLock
 from zero.remote_identifiers import RemoteIdentifiers
-from zero.events import EventListener, FileDeleteEvent, FileUpdateOrCreateEvent
 from zero.dirty_flags import DirtyFlags
 from zero.states import StateMachine
 
@@ -51,6 +47,14 @@ class Balancer:
             .decode("utf-8")
         )
         return float(du_output) / (1000 * 1000)
+
+    def get_eviction_candidates(self, limit):
+        return self.rank_store.get_clean_and_low_rank_inodes(limit)
+        # TODO: Check if eviction candidates actually exist in file system
+
+    def get_priming_candidates(self, limit):
+        return self.rank_store.get_remote_and_high_rank_inodes(limit)
+        # TODO: Check if priming candidates actually exist in file system
 
     def evict(self, number_of_files):
         """Remove unneeded files from cache"""

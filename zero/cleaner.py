@@ -30,7 +30,9 @@ class Cleaner:
         self.dirty_flags = DirtyFlags(cache_folder)
 
     def run_watcher(self):
-        with EventListener(FileUpdateOrCreateEvent.topic) as cleaning_listener:
+        with EventListener(
+            (FileUpdateOrCreateEvent.topic,)
+        ) as cleaning_listener:
             while True:
                 time.sleep(1)
                 for message in cleaning_listener.yield_events():

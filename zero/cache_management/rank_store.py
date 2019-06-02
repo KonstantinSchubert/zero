@@ -13,7 +13,7 @@ class RankStore:
         self.connection = sqlite3.connect(db_path, timeout=5)
         with self.connection:
             self.connection.execute(
-                """CREATE TABLE IF NOT EXISTS ranks (path text primary key, rank real default 0, text file_location)"""
+                """CREATE TABLE IF NOT EXISTS ranks (path text primary key, rank real default 0, file_location text )"""
             )
 
     def record_access(self, path, timestamp):

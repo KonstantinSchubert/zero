@@ -30,8 +30,16 @@ def main():
     fuse = multiprocessing.Process(
         name="fuse", target=fuse_main, args=(args, config)
     )
-    # worker = multiprocessing.Process(
-    #     name="worker", target=worker_main, args=(args, config)
+    ranker_watcher = multiprocessing.Process(
+        name="ranker_watcher", target=ranker_events_watcher, args=(args, config)
+    )
+
+    # ranker_scanner = multiprocessing.Process(
+    #     name="ranker_scanner", target=ranker_scanner, args=(args, config)
+    # )
+
+    # balancer = multiprocessing.Process(
+    #     name="ranker_watcher", target=balancer, args=(args, config)
     # )
 
     deleter = multiprocessing.Process(
@@ -43,9 +51,11 @@ def main():
     )
 
     fuse.start()
-    # worker.start()
     deleter.start()
     cleaner.start()
+    ranker_watcher.start()
+    # ranker_scanner.start()
+    # balancer.start()
 
 
 def fuse_main(args, config):
@@ -71,8 +81,6 @@ def fuse_main(args, config):
 def clean_watcher(args, config):
     print("Starting cleaner")
 
-    # TODO: Extract different worker roles into their own processes
-
     api = FileAPI(
         account_id=config["accountId"],
         application_key=config["applicationKey"],
@@ -80,18 +88,8 @@ def clean_watcher(args, config):
         db_file=config["sqliteFileLocation"],
     )
 
-    # rank_store = RankStore(config["sqliteFileLocation"])
-    # ranker = Ranker(rank_store, inode_store)
     cleaner = Cleaner(cache_folder=args.cache_folder, api=api)
-
     cleaner.run_watcher()
-
-
-# TODO: subcribe Ranker to events
-# TODO: create loop to pull and handle events in Ranker
-# TODO: Ranker creates ranking, also sometimes scans the files in case he doens't correctly keep track of all events (folder moves)
-# TODO: Balancer balances files based on ranking by ranker
-# TODO: Balancer and ranker could also be one thing
 
 
 def delete_watcher(args, config):
@@ -106,6 +104,17 @@ def delete_watcher(args, config):
 
     deleter = Deleter(api=api)
     deleter.run_watcher()
+
+
+def ranker_events_watcher(args, config):
+    print("Starting ranker (event watcher)")
+    ranker = Ranker(db_file=config["sqliteFileLocation"])
+    ranker.watch_events()
+
+
+def ranker_scanner(args, config):
+    ranker = Ranker(db_file=config["sqliteFileLocation"])
+    ranker.scan_file_system()
 
 
 def reset_all():

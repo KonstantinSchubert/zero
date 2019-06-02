@@ -11,7 +11,7 @@ class Deleter:
         self.api = api
 
     def run_watcher(self):
-        with EventListener(FileDeleteEvent.topic) as deletion_listener:
+        with EventListener((FileDeleteEvent.topic,)) as deletion_listener:
             while True:
                 time.sleep(1)
                 for message in deletion_listener.yield_events():
