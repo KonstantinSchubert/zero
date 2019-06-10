@@ -4,6 +4,7 @@ from zero.remote_identifiers import RemoteIdentifiers
 from zero.dirty_flags import DirtyFlags
 from zero.cache import PathDoesNotExistException
 from zero.states import WrongInitialStateException
+from zero.locking import NodeLockedException
 from .ranker import Ranker
 from .rank_store import RankStore
 import time
@@ -69,6 +70,10 @@ class Balancer:
                 self.cache.create_dummy(path)
             except (PathDoesNotExistException, WrongInitialStateException):
                 self.ranker.re_index(path)
+            except NodeLockedException:
+                print(
+                    f"Cannot evict {path} because node is locked. This is probably okay."
+                )
 
     def prime(self, number_of_files):
         """Fill the cache with files from remote
@@ -80,6 +85,10 @@ class Balancer:
                 self.cache.replace_dummy(path)
             except (PathDoesNotExistException, WrongInitialStateException):
                 self.ranker.re_index(path)
+            except NodeLockedException:
+                print(
+                    f"Cannot evict {path} because node is locked. This is probably okay."
+                )
 
     def order_cache(self):
         # TODO: Make sure that biggest file < 0.1 * target_disk_usage, else this won't work.

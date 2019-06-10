@@ -5,7 +5,7 @@ from .path_converter import PathConverter
 from .globals import ANTI_COLLISION_HASH
 
 
-APPENDIX = "_UUID"
+FILENAME_APPENDIX = "UUID"
 
 
 class RemoteIdentifiers:
@@ -35,4 +35,4 @@ class RemoteIdentifiers:
 
     def _uuid_path_from_fuse_path(self, path):
         cache_path = self.path_converter.to_cache_path(path)
-        return cache_path + ANTI_COLLISION_HASH + APPENDIX
+        return f"{cache_path}_{ANTI_COLLISION_HASH}_{FILENAME_APPENDIX}"

@@ -61,13 +61,10 @@ class Cache:
         return None
 
     def _get_path(self, fuse_path):
-
-        # Small composition inversion. Normal is that worker has cache.
-        # This could also be solved with some kind of synchronous signal.
-        cache_path = self.converter.to_cache_path(fuse_path)
-        if os.path.exists(self.converter.add_dummy_ending(cache_path)):
+        if self.states.current_state_is_remote(path=fuse_path):
+            # TODO: Escalate read lock to write lock here
             self._replace_dummy(fuse_path)
-        return cache_path
+        return self.converter.to_cache_path(fuse_path)
 
     def _list_files_and_dummies(self, dir_path):
         return [
@@ -92,6 +89,8 @@ class Cache:
         ):
             cache_path = self._get_path(path)
             print(cache_path)
+            self.metadata_store.record_access(path=path)
+            FileAccessEvent(self.events_channel).submit(path=path)
             return os.open(cache_path, flags)
 
     def read(self, path, size, offset, fh):
@@ -103,8 +102,21 @@ class Cache:
             acquisition_max_retries=100,
             lock_creator="CACHE READ",
         ):
-            self.metadata_store.record_access(path=path)
-            FileAccessEvent(self.events_channel).submit(path=path)
+            TODO: ALTERNATIVE 1:
+            # Do not use fh here, use path, because the file handle comes from "open" (?),
+            # but it might be that between open and read, the file gets moved to remote and back
+            # in this case, the file handle might change in the meantime (?)
+            # Basically, "open" should do nothing apart from maybe logging the access,
+            # and we are actually opening the file in here and also ensuring here that it is local.
+            # In this case, we would probably want to ignore operations such as flush, fsync, etc.
+            # This is probably the simpler approach, but we are probably giving up some options for
+            # performance optimization and I am probably violating some POSIX behavior, such as
+            # file-open -based locks (?), etc..
+            # ALTERNATIVE2:
+            #  we could actually open  file  in python during the "open",   but then we have to
+            # manage the lock lifecycle such that it stays locked during all reads until the file is closed.
+            # And if a write happens, the lock needs to be upgraded to a write lock, so we need to support
+            # re-entry. We would also need to manage the lock without the context manager.
             os.lseek(fh, offset, 0)
             return os.read(fh, size)
 
@@ -173,7 +185,7 @@ class Cache:
                     self.rmdir(new_cache_path)
                     # TODO: If the target contains files, we have to delete them and issue
                     # delete events!
-                elif os.path.isdir(new_cache_path):
+                elif os.path.isfile(new_cache_path):
                     # file_desciptor is a file
                     with PathLock(
                         new_path,
@@ -182,8 +194,6 @@ class Cache:
                     ):
                         self._delete_file(new_path)
                 else:
-                    this case has happened when I deleted a file, it seems
-
                     raise NotImplementedError
 
             if os.path.isdir(old_cache_path):
@@ -193,20 +203,38 @@ class Cache:
             else:
                 # Rename the cache files
                 os.rename(old_cache_path, new_cache_path)
-                # Rename the metadata file
-                # TODO : This is hacky
+                # TODO : This is hacky/ not in the right place
                 os.rename(
                     _metadata_cache_path_from_cache_path(old_cache_path),
                     _metadata_cache_path_from_cache_path(new_cache_path),
                 )
-                os.rename(
-                    DirtyFlags(
-                        self.cache_folder
-                    )._dirty_flag_path_from_fuse_path(old_path),
-                    DirtyFlags(
-                        self.cache_folder
-                    )._dirty_flag_path_from_fuse_path(new_path),
-                )
+                print("renamed metadata")
+                try:
+                    os.rename(
+                        DirtyFlags(
+                            self.cache_folder
+                        )._dirty_flag_path_from_fuse_path(old_path),
+                        DirtyFlags(
+                            self.cache_folder
+                        )._dirty_flag_path_from_fuse_path(new_path),
+                    )
+                    print("renamed dirty flag")
+                except FileNotFoundError:
+                    # Dirty flag file does not exist
+                    pass
+                try:
+                    os.rename(
+                        RemoteIdentifiers(
+                            self.cache_folder
+                        )._uuid_path_from_fuse_path(old_path),
+                        RemoteIdentifiers(
+                            self.cache_folder
+                        )._uuid_path_from_fuse_path(new_path),
+                    )
+                    print("renamed remote identifier file")
+                except FileNotFoundError:
+                    # UUID flag file does not exist
+                    pass
                 # TODO: self.metadata_store. -> record file move
 
     def mkdir(self, path, mode):
@@ -311,11 +339,13 @@ class Cache:
 
     def _replace_dummy(self, path):
         print(f"Replacing dummy [path]")
-        if not self.states.current_stae_is_remote(path):
+        if not self.states.current_state_is_remote(path):
             log.warn(
                 f"Cannot replace dummy for path {path}"
                 "because file is not remote."
             )
+            return
+        self.states.remote_to_clean(path)
         cache_path = self.converter.to_cache_path(path)
         uuid = self.remote_identifiers.get_uuid_or_none(path)
         with open(cache_path, "w+b") as file:
@@ -323,7 +353,6 @@ class Cache:
                 file.write(self.api.download(uuid).read())
             except ConnectionError:
                 raise FuseOSError(errno.ENETUNREACH)
-        self.states.remote_to_clean(path)
 
     def create_dummy(self, path):
         with PathLock(path, lock_creator="create_dummy"):

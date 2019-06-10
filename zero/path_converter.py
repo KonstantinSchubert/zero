@@ -19,18 +19,11 @@ class PathConverter:
         cache system"""
         return cache_path.replace(self.cache_folder, "")
 
-    def is_dummy(self, cache_path):
-        """
-        Returns true if the file is a dummy file
-        """
-        if cache_path.endswith(self.anti_collision_hash + "dummy"):
-            return True
-
     def add_dummy_ending(self, cache_path):
         return cache_path + self.anti_collision_hash + "dummy"
 
     def strip_dummy_ending(self, cache_path):
-        if self.is_dummy(cache_path):
+        if cache_path.endswith(self.anti_collision_hash + "dummy"):
             num_characters_to_strip = len(self.anti_collision_hash + "dummy")
             return cache_path[:-num_characters_to_strip]
         else:

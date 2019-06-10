@@ -55,7 +55,7 @@ class EventListener:
             queue=self.queue_name
         ):
             message = json.loads(body)
-            print(f"Yielding message {message}")
+            # print(f"Yielding message {message}")
             yield message
             self.channel.basic_ack(method_frame.delivery_tag)
 

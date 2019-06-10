@@ -39,6 +39,8 @@ class StateMachine:
         cache_dummy_path = self.path_converter.add_dummy_ending(cache_path)
         # Re-name to preserve file permissions, user id.
         os.rename(cache_path, cache_dummy_path)
+        # Truncate
+        open(cache_dummy_path, "w").close()
 
     def remote_to_clean(self, path):
         if not self.current_state_is_remote(path):
@@ -51,16 +53,16 @@ class StateMachine:
         os.rename(cache_dummy_path, cache_path)
 
     def current_state_is_clean(self, path):
-        return (not self.dirty_flags.has_dirty_flag(path)) and (
-            not self.path_converter.is_dummy(
-                self.path_converter.to_cache_path(path)
-            )
+        return (not self.current_state_is_dirty(path)) and (
+            not self.current_state_is_remote(path)
         )
 
     def current_state_is_dirty(self, path):
         return self.dirty_flags.has_dirty_flag(path)
 
     def current_state_is_remote(self, path):
-        return self.path_converter.is_dummy(
-            self.path_converter.to_cache_path(path)
+        return os.path.isfile(
+            self.path_converter.add_dummy_ending(
+                self.path_converter.to_cache_path(path)
+            )
         )
