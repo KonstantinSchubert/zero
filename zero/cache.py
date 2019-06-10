@@ -1,5 +1,7 @@
 import os
 import errno
+import logging
+from multiprocessing import current_process
 from fuse import FuseOSError
 from .locking import PathLock
 from .events import (
@@ -15,6 +17,8 @@ from .remote_identifiers import RemoteIdentifiers
 from .dirty_flags import DirtyFlags
 from .globals import ANTI_COLLISION_HASH
 from .states import StateMachine
+
+log = logging.getLogger(current_process().name)
 
 
 class PathDoesNotExistException(Exception):
@@ -32,13 +36,14 @@ def is_file_descriptor(cache_path):
 
 class Cache:
 
-    def __init__(self, cache_folder, api):
+    def __init__(self, cache_folder, api, events_channel):
         self.cache_folder = cache_folder
         self.converter = PathConverter(cache_folder)
         self.api = api
         self.metadata_store = MetaData(cache_folder)
         self.states = StateMachine(cache_folder=cache_folder)
         self.remote_identifiers = RemoteIdentifiers(cache_folder)
+        self.events_channel = events_channel
         # instead of passing an instance here, sending a signal to the worker process might be more robust
 
     def _get_path_or_dummy(self, fuse_path):
@@ -99,7 +104,7 @@ class Cache:
             lock_creator="CACHE READ",
         ):
             self.metadata_store.record_access(path=path)
-            FileAccessEvent.submit(path=path)
+            FileAccessEvent(self.events_channel).submit(path=path)
             os.lseek(fh, offset, 0)
             return os.read(fh, size)
 
@@ -108,8 +113,8 @@ class Cache:
         with PathLock(path, high_priority=True, acquisition_max_retries=100):
             self.metadata_store.record_content_modification(path=path)
             cache_path = self.converter.to_cache_path(path)
-            FileUpdateOrCreateEvent.submit(path=path)
-            FileAccessEvent.submit(path=path)
+            FileUpdateOrCreateEvent(self.events_channel).submit(path=path)
+            FileAccessEvent(self.events_channel).submit(path=path)
             with open(cache_path, "r+") as f:
                 return f.truncate(length)
 
@@ -122,11 +127,11 @@ class Cache:
             lock_creator="CACHE WRITE",
         ):
             self.metadata_store.record_content_modification(path=path)
-            FileAccessEvent.submit(path=path)
+            FileAccessEvent(self.events_channel).submit(path=path)
             os.lseek(fh, offset, 0)
             result = os.write(fh, data)
             self.states.dirty_or_clean_to_dirty(path)
-            FileUpdateOrCreateEvent.submit(path=path)
+            FileUpdateOrCreateEvent(self.events_channel).submit(path=path)
             return result
 
     def create(self, path, mode):
@@ -138,8 +143,8 @@ class Cache:
         )
         self.metadata_store.record_content_modification(path=path)
         self.states.clean_to_dirty(path)
-        FileUpdateOrCreateEvent.submit(path=path)
-        FileAccessEvent.submit(path=path)
+        FileUpdateOrCreateEvent(self.events_channel).submit(path=path)
+        FileAccessEvent(self.events_channel).submit(path=path)
         return result
 
     def rename(self, old_path, new_path):
@@ -177,6 +182,8 @@ class Cache:
                     ):
                         self._delete_file(new_path)
                 else:
+                    this case has happened when I deleted a file, it seems
+
                     raise NotImplementedError
 
             if os.path.isdir(old_cache_path):
@@ -255,9 +262,11 @@ class Cache:
             uuid = self.remote_identifiers.get_uuid_or_none(fuse_path)
             if uuid:
                 self.remote_identifiers.delete(path=fuse_path)
-            FileDeleteEvent.submit(uuid=uuid, path=fuse_path)
+            FileDeleteEvent(self.events_channel).submit(
+                uuid=uuid, path=fuse_path
+            )
         except Exception as e:
-            print(e)
+            log.error(e)
 
     def getattributes(self, fuse_path):
         cache_path = self._get_path_or_dummy(fuse_path)
@@ -298,12 +307,12 @@ class Cache:
     def replace_dummy(self, path):
         with PathLock(path, lock_creator="replace_dummy"):
             self._replace_dummy(path)
-            FileLoadedIntoCacheEvent.submit()
+            FileLoadedIntoCacheEvent(self.events_channel).submit(path=path)
 
     def _replace_dummy(self, path):
         print(f"Replacing dummy [path]")
         if not self.states.current_stae_is_remote(path):
-            print(
+            log.warn(
                 f"Cannot replace dummy for path {path}"
                 "because file is not remote."
             )
@@ -324,7 +333,7 @@ class Cache:
                     f"Cannot creat dummy because {path} not found"
                 )
             self.states.clean_to_remote(path)
-            FileEvictedFromCacheEvent.submit()
+            FileEvictedFromCacheEvent(self.events_channel).submit(path=path)
 
     def statfs(self, path):
         cache_path = self._get_path_or_dummy(path)

@@ -72,6 +72,24 @@ class RankStore:
             results = cursor.fetchall()
         return [result[0] for result in results]
 
+    def rename_all_matching_paths(self, old_partial_path, new_partial_path):
+        with self.connection:
+            # Find all rows where the path starts with old_path.
+            # Update all rows, replaceing old_path with new_path in their path
+            cursor = self.connection.execute(
+                f"""SELECT path FROM ranks WHERE path LIKE '{old_partial_path}%'"""
+            )
+            matches = cursor.fetchall()
+            for (matching_path,) in matches:
+                new_path = matching_path.replace(
+                    old_partial_path, new_partial_path
+                )
+                print(f"Replacing paths: {matching_path} to {new_path}")
+                self.connection.execute(
+                    """UPDATE ranks SET path=? WHERE path=?""",
+                    (new_path, matching_path),
+                )
+
     def ranks_are_sorted(self):
         with self.connection:
             cursor = self.connection.execute(

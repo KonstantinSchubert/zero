@@ -1,6 +1,4 @@
 
-import time
-
 from fuse import FUSE
 
 
@@ -8,18 +6,17 @@ from .operations import Filesystem
 from .cache import Cache
 from .cache_management.balancer import Balancer
 from .cache_management.ranker import Ranker
-from .cache_management.rank_store import RankStore
 from .b2_api import FileAPI
 from .deleter import Deleter
 from .cleaner import Cleaner
-from .sqlite_queue import DB_NAME as QUEUE_DB_NAME
+from .events import get_rabbitmq
 
 import multiprocessing
 
 
 from .config_utils import get_config, parse_args
 
-TARGET_DISK_USAGE = 0.01  # GB
+TARGET_DISK_USAGE = 0.001  # GB
 
 
 def main():
@@ -60,14 +57,16 @@ def main():
 
 def fuse_main(args, config):
     print("Starting fuse main")
-
+    _, events_channel = get_rabbitmq()
     api = FileAPI(
         account_id=config["accountId"],
         application_key=config["applicationKey"],
         bucket_id=config["bucketId"],
         db_file=config["sqliteFileLocation"],
     )
-    cache = Cache(cache_folder=args.cache_folder, api=api)
+    cache = Cache(
+        cache_folder=args.cache_folder, api=api, events_channel=events_channel
+    )
     filesystem = Filesystem(cache)
     FUSE(
         filesystem,
@@ -124,14 +123,16 @@ def ranker_scanner(args, config):
 
 def run_balancer(args, config):
     print("Starting balancer")
-
+    _, events_channel = get_rabbitmq()
     api = FileAPI(
         account_id=config["accountId"],
         application_key=config["applicationKey"],
         bucket_id=config["bucketId"],
         db_file=config["sqliteFileLocation"],
     )
-    cache = Cache(cache_folder=args.cache_folder, api=api)
+    cache = Cache(
+        cache_folder=args.cache_folder, api=api, events_channel=events_channel
+    )
     balancer = Balancer(
         cache=cache,
         api=api,
@@ -150,4 +151,3 @@ def reset_all():
     shutil.rmtree(args.cache_folder)
     os.mkdir(args.cache_folder)
     os.remove(config["sqliteFileLocation"])
-    os.remove(QUEUE_DB_NAME)

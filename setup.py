@@ -17,6 +17,9 @@ setup(
         "b2==1.1.0",
         "pyyaml==3.12",
         "portalocker==1.2.1",
+        "pika==1.0.1",
+        # sudo apt install rabbitmq-server
+        # sudo service rabbitmq-server status
     ],
     include_package_data=True,
     zip_safe=True,
