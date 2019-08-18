@@ -74,5 +74,5 @@ debug-delete-everything ~/playground/mountpoint ~/playground/to && zero ~/playgr
 Then run the tests:
 
 ```
-
+py.test zero/tests/system_tests
 ```
