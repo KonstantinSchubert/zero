@@ -1,0 +1,1 @@
+    - Extract the replace_dummy, create_dummy functions into their own module. Both cache and ranker can depend on this module. This module does not need to understand hard links. It can store the file content hash of the original file in the dummy file, and use the hash as well to de-duplicate the uploaded content.

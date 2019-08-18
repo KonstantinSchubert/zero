@@ -26,6 +26,7 @@ class Filesystem(Operations):
             raise FuseOSError(errno.EACCES)
 
     def getattr(self, path, fh=None):
+        print("getattr", path)
         return self.cache.getattributes(path)
 
     @on_cache_path_or_dummy
@@ -39,14 +40,7 @@ class Filesystem(Operations):
     getxattr = None
 
     def link(self, target, source):
-        print("link")
-        # I can maintain a hard link table that basically lists for each path
-        # the  "inode" number ( doesn't need to be the real inode number )
-        # Then, whenever I replace a file with its dummy, I must consider this
-        # table to also configure all other hard links to that inode. Maybe on
-        # the remote end I can even use "inode" number as keys for the files
-        # that are uploaded. This does not solve hard links which point from
-        # my file system to another file system or vice versa
+        # Hard link support is not implemented, see readme.
         raise NotImplementedError
 
     listxattr = None
@@ -62,6 +56,7 @@ class Filesystem(Operations):
 
     @on_cache_path_or_dummy
     def readdir(self, path, fh):
+        print(path)
         return self.cache.list(path, fh)
 
     def release(self, path, fh):
@@ -92,32 +87,9 @@ class Filesystem(Operations):
         print(f"called rename {old} -> {new}")
         return self.cache.rename(old, new)
 
-    @on_cache_path_or_dummy
     def statfs(self, path):
-        cache_stat_info = os.statvfs(path)
-        stat_info = {
-            key: getattr(cache_stat_info, key)
-            for key in (
-                "f_bavail",
-                "f_bfree",
-                "f_blocks",
-                "f_bsize",
-                "f_favail",
-                "f_ffree",
-                "f_files",
-                "f_flag",
-                "f_frsize",
-                "f_namemax",
-            )
-        }
-        # TODO
-
-        # Todo: Remove some keys from above's list and set them here
-        # Deal with the case that that path is a dummy and the case
-        # that it is not
-        # stat_info[""]
-
-        return stat_info
+        print("statfs", path)
+        return self.cache.statfs(path)
 
     @on_cache_path  # links are always local
     def readlink(self, path):

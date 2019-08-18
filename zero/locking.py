@@ -1,6 +1,7 @@
 import os
 import time
 import portalocker
+import hashlib
 from .path_utils import yield_partials
 
 LOCKDIR = "/tmp/zero-locks/"
@@ -11,12 +12,18 @@ class NodeLockedException(Exception):
     pass
 
 
+def hash_string(string):
+    string_hash = hashlib.new("md5")
+    string_hash.update(string.encode())
+    return string_hash.hexdigest()
+
+
 class PathLock:
 
     def __init__(
         self,
         path,
-        inode_store,
+        lock_creator=None,
         exclusive_lock_on_path=False,
         exclusive_lock_on_leaf=True,
         high_priority=False,
@@ -35,20 +42,22 @@ class PathLock:
         for path in partials[:-1]:
             self.locks.append(
                 NodeLock(
-                    inode_store.get_inode(path),
+                    lock_id=hash_string(path),
                     exclusive=exclusive_lock_on_path,
                     acquisition_max_retries=acquisition_max_retries,
                     high_priority=high_priority,
+                    lock_creator=lock_creator,
                 )
             )
         # Lock for leaf
         path = partials[-1]
         self.locks.append(
             NodeLock(
-                inode_store.get_inode(path),
+                lock_id=hash_string(path),
                 exclusive=exclusive_lock_on_leaf,
                 acquisition_max_retries=acquisition_max_retries,
                 high_priority=high_priority,
+                lock_creator=lock_creator,
             )
         )
 
@@ -71,12 +80,18 @@ class PathLock:
 class NodeLock:
 
     def __init__(
-        self, inode, exclusive, acquisition_max_retries=0, high_priority=False
+        self,
+        lock_id,
+        exclusive,
+        lock_creator,
+        acquisition_max_retries=0,
+        high_priority=False,
     ):
         self.exclusive = exclusive
         self.acquisition_max_retries = acquisition_max_retries
-        self.inode = inode
+        self.lock_id = lock_id
         self.high_priority = high_priority
+        self.lock_creator = lock_creator or "Unknown"
 
     def __enter__(self):
         # Lock database while setting lock
@@ -94,10 +109,10 @@ class NodeLock:
 
     def __exit__(self, *args):
         self._unlock()
-        # print(f"unlocked {self.inode}")
+        # print(f"unlocked {self.lock_id}")
 
     def _get_abort_request_file_name(self):
-        return f"{ABORT_REQUEST_DIR}{self.inode}"
+        return f"{ABORT_REQUEST_DIR}{self.lock_id}"
 
     def abort_requested(self):
         return os.path.exists(self._get_abort_request_file_name())
@@ -105,7 +120,7 @@ class NodeLock:
     def _try_locking(self):
         if not os.path.exists(LOCKDIR):
             os.mkdir(LOCKDIR)
-        # print(f"try locking {self.inode}")
+        # print(f"try locking {self.lock_id}")
         try:
             # portalocker.Lock has its own retry functionality,
             # But we cannot use it here, because we want to be able
@@ -114,7 +129,7 @@ class NodeLock:
             # on top of another high-level api such as portalocker.Lock.
             # But since things are still evolving around here, it will leave it as is.
             self.lock = portalocker.Lock(
-                filename=LOCKDIR + str(self.inode),
+                filename=LOCKDIR + str(self.lock_id),
                 fail_when_locked=True,
                 flags=self._get_flags(),
             )
@@ -124,7 +139,7 @@ class NodeLock:
             if self.high_priority:
                 self._request_abort()
             return False
-        # print(f"Managed to lock {self.inode}")
+        # print(f"Managed to lock {self.lock_id}")
         self._remove_abort_request()
         return True
 
@@ -142,6 +157,7 @@ class NodeLock:
             os.remove(self._get_abort_request_file_name())
 
     def _request_abort(self):
+        print(f"{self.lock_creator} is requesting abort")
         if not os.path.exists(ABORT_REQUEST_DIR):
             os.mkdir(ABORT_REQUEST_DIR)
         open(self._get_abort_request_file_name(), "w").close()

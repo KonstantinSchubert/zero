@@ -5,10 +5,10 @@ from ..utils import remove_recursive_silently
 from zero.worker import Worker
 from zero.cache import Cache
 from zero.path_converter import PathConverter
-from zero.state_store import StateStore
 from zero.inode_store import InodeStore
 from zero.rank_store import RankStore
 from zero.ranker import Ranker
+from zero.metadata_store import MetaData
 
 
 CACHE_DIR = "test_cache_dir/"
@@ -23,18 +23,17 @@ class IntegrationTestingContext:
         self.api = api
         os.mkdir(CACHE_DIR)
         self.converter = PathConverter(CACHE_DIR)
-        self.state_store = StateStore(DB_PATH)
         self.inode_store = InodeStore(DB_PATH)
         self.rank_store = RankStore(DB_PATH)
+        self.metadata_store = MetaData(DB_PATH)
         self.ranker = Ranker(self.rank_store, self.inode_store)
         self.cache = Cache(
-            self.converter,
-            self.state_store,
-            self.inode_store,
-            self.ranker,
-            self.api,
+            converter=self.converter,
+            inode_store=self.inode_store,
+            metadata_store=self.metadata_store,
+            api=self.api,
         )
-        self.worker = Worker(self.cache, api, CACHE_SIZE)
+        self.worker = Worker(self.cache, self.ranker, api, CACHE_SIZE)
 
     def create_file(self, path, content):
         self.cache.create(path, 33204)

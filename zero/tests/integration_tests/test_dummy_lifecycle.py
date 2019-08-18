@@ -1,7 +1,6 @@
 from unittest import TestCase
 import stat
 from zero.b2_api import FileAPI
-from zero.b2_file_info_store import FileInfoStore
 from zero.config_utils import get_config
 from zero.operations import Filesystem
 from .configure import IntegrationTestingContext
@@ -18,13 +17,12 @@ class DummyLifeCycleTest(TestCase):
 
     def setUp(self):
         remove_recursive_silently(DB_PATH)
-        file_info_store = FileInfoStore(DB_PATH)
         config = get_config()
         self.api = FileAPI(
-            file_info_store=file_info_store,
             account_id=config["accountId"],
             application_key=config["applicationKey"],
             bucket_id=config["bucketId"],
+            db_file=DB_PATH,
         )
         self.context = IntegrationTestingContext(api=self.api)
         self.filesystem = Filesystem(self.context.cache)

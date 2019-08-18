@@ -17,13 +17,15 @@ setup(
         "b2==1.1.0",
         "pyyaml>=4.2b1",
         "portalocker==1.2.1",
+        "pika==1.0.1",
+        # sudo apt install rabbitmq-server
+        # sudo service rabbitmq-server status
     ],
     include_package_data=True,
     zip_safe=True,
     entry_points={
         "console_scripts": [
-            "zero-fuse = zero.main:fuse_main",
-            "zero-worker = zero.main:worker_main",
+            "zero = zero.main:main",
             "debug-delete-everything = zero.main:reset_all",
         ]
     },

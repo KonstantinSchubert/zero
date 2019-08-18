@@ -22,7 +22,12 @@ class WorkerTest(unittest.TestCase):
         # Todo mock this and pass fake data here (?)
         self.api = MagicMock()
         self.context = IntegrationTestingContext(self.api)
-        self.worker = Worker(self.context.cache, self.api, CACHE_SIZE)
+        self.worker = Worker(
+            cache=self.context.cache,
+            api=self.api,
+            ranker=self.context.ranker,
+            target_disk_usage=CACHE_SIZE,
+        )
         file_path = self.context.create_file(PATH, FILE_CONTENT)
         self.inode = self.context.inode_store.get_inode(file_path)
         self.converter = self.context.converter
