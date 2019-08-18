@@ -112,6 +112,9 @@ class Cache:
             # This is probably the simpler approach, but we are probably giving up some options for
             # performance optimization and I am probably violating some POSIX behavior, such as
             # file-open -based locks (?), etc..
+            # However, I could always implement another layer of abstraction in front of this "cache",
+            # that acts like an actual cache and actually makes use of flush, and fsync etc.
+            # This here might be relevant: https://stackoverflow.com/a/2340641
             # ALTERNATIVE2:
             #  we could actually open  file  in python during the "open",   but then we have to
             # manage the lock lifecycle such that it stays locked during all reads until the file is closed.
