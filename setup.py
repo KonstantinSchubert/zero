@@ -14,7 +14,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         "fusepy==2.0.4",
-        "b2==1.1.0",
+        "b2==3.2.1",
         "pyyaml>=4.2b1",
         "portalocker==1.2.1",
         "pika==1.0.1",
